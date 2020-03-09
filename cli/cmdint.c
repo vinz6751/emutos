@@ -210,10 +210,25 @@ PRIVATE LONG run_cd(WORD argc,char **argv)
 {
 char path[MAXPATHLEN];
 LONG rc;
+char *p;
+    p = argv[1];
 
-    if (argc != 1)
-        return Dsetpath(argv[1]);
+    if (argc != 1) {
+        /* if the path specifies a drive, we need to temporarily change to
+         * that drive. We do that unconditionnally to save a bit of memory,
+         * and also to validate that the drive is still valid */
+        if (strlen(p) >= 2 && p[1] == ':') {
+            WORD current_drive = Dgetdrv();
+            if ((rc = run_setdrv(1,&p))) return rc;
+            rc = Dsetpath(p);
+            Dsetdrv(current_drive);
+            return rc;
+        }
+        else
+            return Dsetpath(p);
+    }
 
+    /* just output current path */
     rc = get_path(path);
     outputnl(path);
 
@@ -377,6 +392,8 @@ PRIVATE LONG run_mkdir(WORD argc,char **argv)
     return Dcreate(argv[1]);
 }
 
+PRIVATE int set_color_from_rgb(const char *rgb, WORD colournr); /* Helper for the below */
+
 PRIVATE LONG run_mode(WORD argc,char **argv)
 {
 char buf[80];
@@ -411,7 +428,12 @@ WORD res = -1, rate = -1, delay = -1;
                 rate = getword(*argv+5);
                 if (rate < 0)
                     return INVALID_PARAM;
-            } else return INVALID_PARAM;
+            } 
+            else if (strncasecmp(*argv,"bg=",3) == 0)
+                return set_color_from_rgb(*argv+3, 0);
+            else if (strncasecmp(*argv,"fg=",3) == 0)
+                return set_color_from_rgb(*argv+3, 3);
+            else return INVALID_PARAM;
         }
         if ((delay >= 0) || (rate >= 0))
             Kbrate(delay,rate);
@@ -421,8 +443,28 @@ WORD res = -1, rate = -1, delay = -1;
         }
         return 0;
     }
-
     return INVALID_PARAM;
+}
+
+PRIVATE int set_color_from_rgb(const char *rgb, WORD colournr) {
+WORD colour = 0;
+WORD x;
+int i;
+    if (strlen(rgb) != 3)
+        return INVALID_PARAM;
+    for (i = 0; i < 3; i++) {
+        colour <<= 4;
+
+        if ((x = toupper(rgb[i]) - 'A') >= 0)
+            x += 0xA;
+        else
+            x = rgb[i] - '0';
+
+        colour |= (x >> 1) | ((x & 1) << 3);
+    }
+
+    Setcolor(colournr,colour);
+    return 0;
 }
 
 PRIVATE LONG run_more(WORD argc,char **argv)
