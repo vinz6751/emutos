@@ -10,7 +10,11 @@
  * option any later version.  See doc/license.txt for details.
  */
 /*
- * This manage the environment variables in a basic way.
+ * This allows to read environment variables in a very minimal way.
+ * For the standalone version, the environment is the one given by the
+ * parent process.
+ * For the version builtin EmuTOS, the environment is taken from the
+ * "the_env" TOS variable at 0x4be, so an AUTO program can set it.
  */
 
 #include "cmd.h"
@@ -19,7 +23,7 @@
 #define the_env	(char**)0x4be /* TOS variable  */
 extern char *environment;       /* from cmdasm.S */
 
-/* To pass info from the function called by Supexec */
+/* To pass variable name to getenv */
 PRIVATE char *varname;
 
 PRIVATE char *getenv(void);
@@ -76,8 +80,6 @@ PRIVATE char *getenv(void) {
 }
 
 
-/* CAVEAT: We don't expect the = to be missing. Can be pretty bad if you 
- * run the console at start of EMUTOS after AUTO programs set wrong env... */
 PRIVATE inline int find_separator_position(char *var) {
 	char *start = var;
 
