@@ -78,6 +78,9 @@ WORD argc, rc;
 
     nflops_copy = Supexec(get_nflops);      /* number of floppy drives */
 
+
+
+    /* Setup executable lookup path */
     /*
      * start up in ST medium if we are currently in ST low
      */
@@ -97,6 +100,17 @@ WORD argc, rc;
     if (init_cmdedit() < 0)
         messagenl(_("warning: no history buffers"));
 
+	{
+		/* Setup path from the PATH environment variable
+		 * (should be correctly formatted, no TOS quirk) */
+		char *largv[2];
+		largv[1] = cmdenv_getenv("PATH");	
+		if (largv[1]) {
+			largv[0] = "path";
+			execute(2,largv,redir_name);
+		}
+	}
+    
     while(1) {
         init_screen();      /* init variables for screen size */
 
