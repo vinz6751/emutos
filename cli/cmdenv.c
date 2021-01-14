@@ -16,8 +16,8 @@
 #include "cmd.h"
 #include "string.h"
 
-#define the_env	(char**)0x4be /* TOS variable */
-
+#define the_env	(char**)0x4be /* TOS variable  */
+extern char *environment;       /* from cmdasm.S */
 
 /* To pass info from the function called by Supexec */
 PRIVATE char *varname;
@@ -27,11 +27,19 @@ PRIVATE int find_separator_position(char *var);
 
 char *cmdenv_getenv(char *name) {
 	varname = name;
-	return (char*)Supexec(getenv);
+#ifdef STANDALONE_CONSOLE
+	return getenv();
+#else
+	return (char*)Supexec(getenv); /* Reading "the_env" requires supervisor mode */
+#endif
 }
 
 PRIVATE char *getenv(void) {
+#ifdef STANDALONE_CONSOLE
+	char *c = environment;
+#else
 	char *c = *the_env;
+#endif
 	BOOL  notdone;
 	int   namelen;
 	int   separator;

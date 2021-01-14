@@ -1,7 +1,7 @@
 /*
  * EmuCON2 assembler routines
  *
- * Copyright (C) 2013-2019 The EmuTOS development team
+ * Copyright (C) 2013-2021 The EmuTOS development team
  *
  * Authors:
  *  RFB    Roger Burrows
@@ -24,6 +24,9 @@
 _coma_start:
         move.l  4(sp),a5                // a5 -> basepage
         lea     stack,sp
+#ifdef STANDALONE_CONSOLE
+        move.l  44(a5),_environment     // The standalone version gets environment from here, the embedded from 0x4be
+#endif
         move.l  12(a5),d0               // calc memory required
         add.l   20(a5),d0
         add.l   28(a5),d0
@@ -97,6 +100,11 @@ _jmp_xbios:
         rts
 
         .bss
+#ifdef STANDALONE_CONSOLE
+        .globl  _environment
+_environment:
+        .ds.l   1
+#endif
 ret_addr:
         .ds.l   1
 save_a2:
