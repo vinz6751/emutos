@@ -78,9 +78,6 @@ WORD argc, rc;
 
     nflops_copy = Supexec(get_nflops);      /* number of floppy drives */
 
-
-
-    /* Setup executable lookup path */
     /*
      * start up in ST medium if we are currently in ST low
      */
