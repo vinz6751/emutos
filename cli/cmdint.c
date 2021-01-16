@@ -485,9 +485,9 @@ LONG rc = 0L;
     }
 
     for (p = argv[1]; *p; ) {
-      if (!get_path_component(&p,temp))
+        if (!get_path_component(&p,temp))
             break;
-      rc = check_path_component(temp);
+        rc = check_path_component(temp);
         if (rc < 0L)
             break;
     }
