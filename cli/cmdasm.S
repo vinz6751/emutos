@@ -18,15 +18,16 @@
         .globl  _coma_start
         .globl  _getwh,_getht
         .globl  _jmp_gemdos,_jmp_bios,_jmp_xbios
+        .globl  _environment
         .extern _cmdmain
 
         .text
 _coma_start:
         move.l  4(sp),a5                // a5 -> basepage
         lea     stack,sp
-#ifdef STANDALONE_CONSOLE
-        move.l  44(a5),_environment     // The standalone version gets environment from here, the embedded from 0x4be
-#endif
+
+        move.l  44(a5),_environment
+
         move.l  12(a5),d0               // calc memory required
         add.l   20(a5),d0
         add.l   28(a5),d0
@@ -100,11 +101,8 @@ _jmp_xbios:
         rts
 
         .bss
-#ifdef STANDALONE_CONSOLE
-        .globl  _environment
 _environment:
         .ds.l   1
-#endif
 ret_addr:
         .ds.l   1
 save_a2:

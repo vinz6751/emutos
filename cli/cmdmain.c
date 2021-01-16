@@ -97,17 +97,30 @@ WORD argc, rc;
     if (init_cmdedit() < 0)
         messagenl(_("warning: no history buffers"));
 
-	{
-		/* Setup path from the PATH environment variable
-		 * (should be correctly formatted, no TOS quirk) */
-		char *largv[2];
-		largv[1] = cmdenv_getenv("PATH");	
-		if (largv[1]) {
-			largv[0] = "path";
-			execute(2,largv,redir_name);
-		}
-	}
-    
+    {
+        /* Setup path from the PATH environment variable
+         * (should be correctly formatted, no TOS quirk) */
+        char *largv[2];
+        largv[1] = cmdenv_getenv("PATH");
+        if (largv[1]) {
+            largv[0] = "path";
+            execute(2,largv,redir_name);
+        }
+        largv[1] = cmdenv_getenv("HOME");
+        if (largv[1]) {
+            largv[0] = "cd";
+            execute(2,largv,redir_name);
+
+            if (largv[1][1] == ':') {
+                /* Switch to drive */
+                char set_drive[]="x:";
+                set_drive[0] = largv[1][0];
+                largv[0] = set_drive;
+                execute(1,largv,redir_name);
+            }
+        }
+    }
+
     while(1) {
         init_screen();      /* init variables for screen size */
 

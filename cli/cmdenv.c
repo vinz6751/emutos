@@ -11,39 +11,20 @@
  */
 /*
  * This allows to read environment variables in a very minimal way.
- * For the standalone version, the environment is the one given by the
- * parent process.
- * For the version builtin EmuTOS, the environment is taken from the
- * "the_env" TOS variable at 0x4be, so an AUTO program can set it.
+ * The environment is provided by the parent process.
  */
 
 #include "cmd.h"
 #include "string.h"
 
-#define the_env	(char**)0x4be /* TOS variable  */
 extern char *environment;       /* from cmdasm.S */
 
-/* To pass variable name to getenv */
-PRIVATE char *varname;
 
-PRIVATE char *getenv(void);
 PRIVATE int find_separator_position(char *var);
 
-char *cmdenv_getenv(char *name) {
-	varname = name;
-#ifdef STANDALONE_CONSOLE
-	return getenv();
-#else
-	return (char*)Supexec(getenv); /* Reading "the_env" requires supervisor mode */
-#endif
-}
 
-PRIVATE char *getenv(void) {
-#ifdef STANDALONE_CONSOLE
+char *cmdenv_getenv(char *varname) {
 	char *c = environment;
-#else
-	char *c = *the_env;
-#endif
 	BOOL  notdone;
 	int   namelen;
 	int   separator;

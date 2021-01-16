@@ -249,4 +249,4 @@ ULONG getwh(void);
 WORD getht(void);
 
 /* cmdenv.c */
-char *cmdenv_getenv(char *name);
+char *cmdenv_getenv(char *varname);
