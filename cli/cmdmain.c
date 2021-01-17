@@ -102,13 +102,13 @@ WORD argc, rc;
          * (should be correctly formatted, no TOS quirk) */
         char *largv[2];
         largv[1] = cmdenv_getenv("PATH");
-        if (largv[1]) {
+        if (largv[1] && largv[1][0]) {
             /* path ${PATH$} */
             largv[0] = "path";
             execute(2,largv,redir_name);
         }
         largv[1] = cmdenv_getenv("HOME");
-        if (largv[1]) {
+        if (largv[1] && largv[1][0]) {
             /* cd ${HOME} */
             largv[0] = "cd";
             execute(2,largv,redir_name);
