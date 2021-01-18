@@ -17,15 +17,14 @@
 #include "cmd.h"
 #include "string.h"
 
-extern char *environment;       /* from cmdasm.S */
+extern char *environment; /* from cmdasm.S */
 
 
 PRIVATE int find_separator_position(char *var);
 
 
 char *cmdenv_getenv(char *varname) {
-	char *c = environment;
-	BOOL  notdone;
+	char *c;
 	int   namelen;
 	int   separator;
 	char *n;
@@ -33,28 +32,22 @@ char *cmdenv_getenv(char *varname) {
 	/* GCC compiles this to something shorter than strlen */
 	n = varname;
 	while (*n++);
-  	namelen = n - varname;
-  
-  	if (--namelen == 0)
-  		return NULL;
+	namelen = n - varname -1;
 
-	notdone = c && *c;
-	while (notdone) {
+	if ((c = environment) == NULL || namelen == 0)
+		return NULL;
+
+	while (*c) {
 
 		/* separator is the position of "=" between name and value */
 		separator = find_separator_position(c);
-		if (--separator != namelen)
-			continue;
+		if (separator && separator == namelen && !strncasecmp(varname,c,namelen))
+			return &(c[separator+1]);
 
-		if (strncasecmp(varname,c,namelen) == 0)
-			return &(c[separator+1]);	
-	
 		/* Find next variable */
 		while (*c++);
-		
-		/* Two consecutives NULL mean end of environment */
-		if (!*c)
-			notdone = FALSE;
+
+		/* Two consecutives NULL mean end of environment string */
 	}
 
 	return NULL;
@@ -64,7 +57,12 @@ char *cmdenv_getenv(char *varname) {
 PRIVATE inline int find_separator_position(char *var) {
 	char *start = var;
 
-	while (*var && *var++ != '=');
+	while (*var) {
+		if (*var++ == '=')
+			return var - start - 1;
+	}
 
-	return var - start;
+	/* We didn't find any "=" sign. That's a quirk. We don't handle that
+	 * so we return 0 to signal an error. */
+	return 0;
 }
