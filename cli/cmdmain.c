@@ -1,7 +1,7 @@
 /*
  * EmuCON2: a command processor for EmuTOS
  *
- * Copyright (C) 2013-2019 The EmuTOS development team
+ * Copyright (C) 2013-2021 The EmuTOS development team
  *
  * Authors:
  *  RFB    Roger Burrows
@@ -23,6 +23,7 @@
  */
 #include "cmd.h"
 #include "version.h"
+#include "shellutl.h"
 
 /*
  *  global variables
@@ -101,13 +102,13 @@ WORD argc, rc;
         /* Setup path from the PATH environment variable
          * (should be correctly formatted, no TOS quirk) */
         char *largv[2];
-        largv[1] = cmdenv_getenv("PATH");
+		shellutl_getenv(environment,&largv[1],"PATH=");
         if (largv[1] && largv[1][0]) {
             /* path ${PATH$} */
             largv[0] = "path";
             execute(2,largv,redir_name);
         }
-        largv[1] = cmdenv_getenv("HOME");
+        shellutl_getenv(environment,&largv[1],"HOME=");
         if (largv[1] && largv[1][0]) {
             /* cd ${HOME} */
             largv[0] = "cd";

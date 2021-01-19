@@ -27,6 +27,7 @@
 
 #include "portab.h"
 
+extern char *environment; /* environment string, from cmdAsm.s */
 
 /*
  * system calls

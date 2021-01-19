@@ -1,6 +1,5 @@
 /*      GEMSHLIB.C      4/18/84 - 09/13/85      Lee Lorenzen            */
 /*      merge High C vers. w. 2.2               8/24/87         mdf     */
-/*      fix sh_envrn                            11/17/87        mdf     */
 
 /*
 *       Copyright 1999, Caldera Thin Clients, Inc.
@@ -339,7 +338,7 @@ static WORD findfile(char *pspec)
     }
 
     /* (4) search in the AES path */
-    sh_envrn(ad_envrn, &path, PATH_ENV);      /* find PATH= in the command tail */
+    shellutl_getenv(ad_envrn, &path, PATH_ENV);      /* find PATH= in the command tail */
     if (!path)
     {
         KDEBUG(("sh_find(): no AES path, '%s' not found\n",pspec));

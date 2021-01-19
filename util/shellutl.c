@@ -24,22 +24,18 @@
 
 /*
  * Get current directory for the current drive.
- * ppath is the output buffer.
+ * opath is the output buffer.
  */
-void shellutl_get_current_drive_and_dir(char *path)
+void shellutl_get_current_drive_and_dir(char *opath)
 {
 	WORD drive;
 
-	/* remember current directory */
-	drive = dos_gdrv();
-	*path++ = drive + 'A';
-	*path++ = ':';
-	*path = '\0';
-	dos_gdir(drive+1, path);
-	if (*path == '\0')
+	drive = shellutl_get_current_drive_root(opath);
+	dos_gdir(drive+1, opath);
+	if (*opath == '\0')
     {
-		*path++ = '\\';
-		*path = '\0';
+		*opath++ = '\\';
+		*opath = '\0';
     }
 }
 
@@ -142,22 +138,24 @@ WORD shellutl_get_drive(const char *path)
 
 
 /*
- *  Set default desktop path (root of current drive)
+ *  Get root folder of current drive
  */
-void sh_curdir(char *ppath)
+WORD shellutl_get_current_drive_root(char *opath)
 {
-    *ppath++ = dos_gdrv() + 'A';
-    *ppath++ = ':';
-    *ppath++ = '\\';
-    *ppath = '\0';
+	WORD drive;
+
+	drive = dos_gdrv();
+	shellutl_build_root_path(opath,drive);
+
+	return drive;
 }
 
 /*
  *  Build root path for specified drive
  */
-void shellutl_build_root_path(const char *path, WORD drive)
+void shellutl_build_root_path(char *opath, WORD drive)
 {
-    char *p = (char*)path;
+    char *p = opath;
 
     *p++ = drive;
     *p++= ':';
@@ -172,7 +170,7 @@ void shellutl_build_root_path(const char *path, WORD drive)
  *  is found, the value is a pointer to the first character after the
  *  string; otherwise it is a NULL pointer.
  */
-void sh_envrn(char *environment, char **ppath, const char *psrch)
+void shellutl_getenv(char *environment, char **ppath, const char *psrch)
 {
     char *p;
     WORD len;
@@ -194,10 +192,6 @@ void sh_envrn(char *environment, char **ppath, const char *psrch)
             ;
     }
 }
-
-
-
-
 
 
 /*

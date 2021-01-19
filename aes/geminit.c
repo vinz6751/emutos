@@ -704,7 +704,7 @@ void run_accs_and_desktop(void)
 
     wm_start();                     /* initialise window vars */
     fs_start();                     /* startup gem libs */
-    sh_curdir(D.s_cdir);            /* remember current desktop directory */
+    shellutl_get_current_drive_root(D.s_cdir); /* remember current desktop directory */
     isgem = process_inf2(&isauto);  /* process emudesk.inf part 2 */
 
     dsptch();                       /* off we go !!! */
