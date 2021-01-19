@@ -1041,7 +1041,7 @@ static void save_to_disk(char *buf, WORD len)
         if (ret == 0L)
             break;
         /* error - prompt user */
-        if (fun_alert_merge(1, STCRTFIL, filename_start(inf_file_name)) != 2)
+        if (fun_alert_merge(1, STCRTFIL, shellutl_filename_start(inf_file_name)) != 2)
             return;                     /* if not retrying, return now */
     }
 
@@ -1412,7 +1412,7 @@ ANODE *app_afind_by_name(WORD atype, WORD ignore, char *pspec, char *pname, WORD
     char pathname[MAXPATHLEN];
 
     strcpy(pathname,pspec);                 /* build full pathname */
-    strcpy(filename_start(pathname),pname);
+    strcpy(shellutl_filename_start(pathname),pname);
 
     for (pa = G.g_ahead; pa; pa = pa->a_next)
     {
@@ -1476,7 +1476,7 @@ BOOL app_read_inf(void)
     rc = fsel_exinput(path, fname, &button, p);
     if ((rc == 0) || (button == 0))
         return FALSE;
-    strcpy(filename_start(path), fname);
+    strcpy(shellutl_filename_start(path), fname);
 
     /* allocate temporary buffer */
     buf = dos_alloc_anyram(SIZE_SHELBUF);

@@ -256,7 +256,7 @@ WORD pn_active(PNODE *pn, BOOL include_folders)
      */
     if (include_folders)                /* match all folders? */
         del_fname(search);              /* yes - change search filespec to *.* */
-    match = filename_start(pn->p_spec); /* the match filespec is always unaltered */
+    match = shellutl_filename_start(pn->p_spec); /* the match filespec is always unaltered */
     for (ret = dos_sfirst(search, pn->p_attr), count = 0; (ret == 0) && (count < maxcount); ret = dos_snext())
     {
         if (G.g_wdta.d_attrib != FA_SUBDIR) /* skip *files* that don't match */

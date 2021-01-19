@@ -13,19 +13,23 @@
 #ifndef _SHELLUTL_H
 #define _SHELLUTL_H
 
-void sh_curdrvdir(char *ppath);
-void build_root_path(char *path,WORD drive);
-char *sh_name(char *ppath);
-char *sh_path(char *src, char *dest, char *pname);
+
+WORD shellutl_get_drive(const char *path);
+BOOL shellutl_is_drive_valid(char drive, char *drvstr);
+void  shellutl_get_current_drive_and_dir(char *path);
+char *shellutl_get_filename_part(char *path);
+char *shellutl_get_path_components(char *paths, const char *filename_to_append, char *opath);
+char *shellutl_filename_start(const char *path);
+void  shellutl_build_root_path(const char *path,WORD drive);
+
 void sh_envrn(char *environment, char **ppath, const char *psrch);
-char *filename_start(char *path);
 WORD wildcmp(const char *pwld, const char *ptst);
-WORD get_drive(char *path);
+
 void sh_curdir(char *ppath);
 LONG readfile(char *filename, LONG count, char *buf);
 
 WORD set_default_path(char *path);
-BOOL shellutl_is_drive_valid(char drive, char *drvstr);
+
 /* to add desksupp.c file_exists and many other things from there */
 
 #endif

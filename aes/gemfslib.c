@@ -585,7 +585,7 @@ WORD fs_input(char *pipath, char *pisel, WORD *pbutton, char *pilabel)
         else
             obj->ob_state |= DISABLED;
     }
-    select_drive(tree,get_drive(locstr),0);
+    select_drive(tree,shellutl_get_drive(locstr),0);
 
     /* set clip and start form fill-in by drawing the form */
     gsx_sclip(&gl_rfs);
@@ -634,7 +634,7 @@ WORD fs_input(char *pipath, char *pisel, WORD *pbutton, char *pilabel)
                     sprintf(locstr,"%c:\\%s",'A'+dos_gdrv(),mask);
 #pragma GCC diagnostic pop
                 }
-                select_drive(tree,get_drive(locstr),TRUE);
+                select_drive(tree,shellutl_get_drive(locstr),TRUE);
             }
             strcpy(locold,locstr);
         }
@@ -734,7 +734,7 @@ WORD fs_input(char *pipath, char *pisel, WORD *pbutton, char *pilabel)
             drive = touchob - DRIVE_OFFSET;
             if ((drive < 0) || (drive >= NM_DRIVES))/* not for us */
                 break;
-            if (drive == get_drive(locstr))         /* no change */
+            if (drive == shellutl_get_drive(locstr))         /* no change */
                 break;
             if (path_changed(locstr))       /* like TOS, if user edited mask, */
                 break;                      /*  ignore drive change           */
@@ -756,7 +756,7 @@ WORD fs_input(char *pipath, char *pisel, WORD *pbutton, char *pilabel)
 
         if (!newlist && !newdrive && path_changed(locstr))  /* path changed manually */
         {
-            if (get_drive(ad_fpath) != get_drive(locstr))   /* drive has changed */
+            if (shellutl_get_drive(ad_fpath) != shellutl_get_drive(locstr))   /* drive has changed */
                 newdrive = TRUE;
             else
                 newlist = TRUE;

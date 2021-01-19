@@ -22,20 +22,24 @@
 
 #include <string.h>
 
-void sh_curdrvdir(char *ppath)
+/*
+ * Get current directory for the current drive.
+ * ppath is the output buffer.
+ */
+void shellutl_get_current_drive_and_dir(char *path)
 {
 	WORD drive;
 
 	/* remember current directory */
 	drive = dos_gdrv();
-	*ppath++ = drive + 'A';
-	*ppath++ = ':';
-	*ppath = '\0';
-	dos_gdir(drive+1, ppath);
-	if (*ppath == '\0')
+	*path++ = drive + 'A';
+	*path++ = ':';
+	*path = '\0';
+	dos_gdir(drive+1, path);
+	if (*path == '\0')
     {
-		*ppath++ = '\\';
-		*ppath = '\0';
+		*path++ = '\\';
+		*path = '\0';
     }
 }
 
@@ -44,19 +48,121 @@ void sh_curdrvdir(char *ppath)
  *  Return a pointer to the start of the filename in a path
  *  (assumed to be the last component of the path)
  */
-char *sh_name(char *ppath)
+char *shellutl_get_filename_part(char *path)
 {
-	char *pname = ppath;
+	char *name = path;
 
 	/*
 	 * note: filename_start() assumes that there is a filename separator
 	 * within the path, so we handle a path like X:AAAAAAAA.BBB before
 	 * calling the general function
 	 */
-	if (ppath[0] && (ppath[1] == ':'))
-		pname += 2;
+	if (path[0] && (path[1] == ':'))
+		name += 2;
 
-	return filename_start(pname);
+	return shellutl_filename_start(name);
+}
+
+
+/*
+ *  "Search next"-style routine to pick up each path in the PATH= portion
+ *  of the environment. These can be delimited by "," or ";".
+ *  For each path, it returns a pointer to the start of the
+ *  following path and appends the given filename, until there are no more
+ *  paths to find.
+ *  paths is list of paths, e.g C:BIN;D:\USR\BIN
+ *  opath is the returned path C:\BIN\TEST.TXT, then D:\USR\BIN\TEST.TXT
+ *  filename_to_append, in this example, is TEST.TXT
+ */
+char *shellutl_get_path_components(char *paths, const char *filename_to_append, char *opath)
+{
+    char last = 0;
+    char *p;
+
+    if (!paths)           /* precautionary */
+        return NULL;
+
+    /* check for end of PATH= env var */
+    if (!*paths)
+        return NULL;
+
+    /* copy over path */
+    for (p = paths; *p; )
+    {
+        if ((*p == ';') || (*p == ','))
+            break;
+        last = *p;
+        *opath++ = *p++;
+    }
+
+    /* see if extra slash is needed */
+    if ((last != '\\') && (last != ':'))
+        *opath++ = '\\';
+
+    /* append file name */
+    strcpy(opath, filename_to_append);
+
+    /* point past terminating separator or nul */
+    return p + 1;
+}
+
+
+/*
+ * return pointer to start of last segment of path
+ * (assumed to be the filename)
+ */
+char *shellutl_filename_start(const char *path)
+{
+    char *start = (char*)path;
+
+    while (*path)
+        if (*path++ == '\\')
+            start = (char*)path;
+
+    return start;
+}
+
+
+/*
+ *  get drive number from specified path (if possible) or default
+ */
+WORD shellutl_get_drive(const char *path)
+{
+    char c;
+
+    if (path[1] == ':')     /* drive letter is present */
+    {
+        c = toupper(path[0]);
+        if ((c >= 'A') && (c <= 'Z'))
+            return c - 'A';
+    }
+
+    return dos_gdrv();
+}
+
+
+/*
+ *  Set default desktop path (root of current drive)
+ */
+void sh_curdir(char *ppath)
+{
+    *ppath++ = dos_gdrv() + 'A';
+    *ppath++ = ':';
+    *ppath++ = '\\';
+    *ppath = '\0';
+}
+
+/*
+ *  Build root path for specified drive
+ */
+void shellutl_build_root_path(const char *path, WORD drive)
+{
+    char *p = (char*)path;
+
+    *p++ = drive;
+    *p++= ':';
+    *p++ = '\\';
+    *p = '\0';
 }
 
 
@@ -90,58 +196,8 @@ void sh_envrn(char *environment, char **ppath, const char *psrch)
 }
 
 
-/*
- *  Search next style routine to pick up each path in the PATH= portion
- *  of the DOS environment.  It returns a pointer to the start of the
- *  following path until there are no more paths to find.
- */
-char *sh_path(char *src, char *dest, char *pname)
-{
-    char last = 0;
-    char *p;
-
-    if (!src)           /* precautionary */
-        return NULL;
-
-    /* check for end of PATH= env var */
-    if (!*src)
-        return NULL;
-
-    /* copy over path */
-    for (p = src; *p; )
-    {
-        if ((*p == ';') || (*p == ','))
-            break;
-        last = *p;
-        *dest++ = *p++;
-    }
-
-    /* see if extra slash is needed */
-    if ((last != '\\') && (last != ':'))
-        *dest++ = '\\';
-
-    /* append file name */
-    strcpy(dest, pname);
-
-    /* point past terminating separator or nul */
-    return p + 1;
-}
 
 
-/*
- * return pointer to start of last segment of path
- * (assumed to be the filename)
- */
-char *filename_start(char *path)
-{
-    char *start = path;
-
-    while (*path)
-        if (*path++ == '\\')
-            start = path;
-
-    return start;
-}
 
 
 /*
@@ -186,47 +242,6 @@ WORD i;
 }
 
 
-/*
- *  get drive number from specified path (if possible) or default
- */
-WORD get_drive(char *path)
-{
-    char c;
-
-    if (path[1] == ':')     /* drive letter is present */
-    {
-        c = toupper(path[0]);
-        if ((c >= 'A') && (c <= 'Z'))
-            return c - 'A';
-    }
-
-    return dos_gdrv();
-}
-
-
-/*
- *  Set default desktop path (root of current drive)
- */
-void sh_curdir(char *ppath)
-{
-    *ppath++ = dos_gdrv() + 'A';
-    *ppath++ = ':';
-    *ppath++ = '\\';
-    *ppath = '\0';
-}
-
-/*
- *  Build root path for specified drive
- */
-void build_root_path(char *path,WORD drive)
-{
-    char *p = path;
-
-    *p++ = drive;
-    *p++= ':';
-    *p++ = '\\';
-    *p = '\0';
-}
 
 
 /*

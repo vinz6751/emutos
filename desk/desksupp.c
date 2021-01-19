@@ -345,7 +345,7 @@ static DTA *file_exists(char *path, char *name)
 
     strcpy(fullname, path);
     if (name)
-        strcpy(filename_start(fullname),name);
+        strcpy(shellutl_filename_start(fullname),name);
     dta = dos_gdta();
     dos_sdta(&G.g_wdta);
     rc = dos_sfirst(fullname, ALLFILES);
@@ -372,7 +372,7 @@ void remove_locate_shortcut(WORD curr)
     if (!pa)        /* can't happen */
         return;
 
-    rc = fun_alert_merge(1, STRMVLOC, filename_start(pa->a_pdata));
+    rc = fun_alert_merge(1, STRMVLOC, shellutl_filename_start(pa->a_pdata));
     switch(rc)
     {
     case 1:             /* Remove */
@@ -380,13 +380,13 @@ void remove_locate_shortcut(WORD curr)
         app_blddesk();
         break;
     case 2:             /* Locate */
-        build_root_path(path, 'A'+G.g_stdrv);
+        shellutl_build_root_path(path, 'A'+G.g_stdrv);
         fname[0] = '\0';
         p = desktop_str_addr(STLOCATE);
         rc = fsel_exinput(path, fname, &button, p);
         if ((rc == 0) || (button == 0))
             break;
-        p = filename_start(path);
+        p = shellutl_filename_start(path);
         if (pa->a_type == AT_ISFILE)
             strcpy(p, fname);
         else
@@ -612,7 +612,7 @@ BOOL print_file(char *name,LONG bufsize,char *iobuf)
 
     /* open dialog, set busy cursor */
     tree = desk_rs_trees[ADPRINT];
-    set_tedinfo_name(tree, PRNAME, filename_start(name));
+    set_tedinfo_name(tree, PRNAME, shellutl_filename_start(name));
     start_dialog(tree);
 
     graf_mouse(HGLASS,NULL);    /* say we're busy */
@@ -885,7 +885,7 @@ WORD do_aopen(ANODE *pa, WORD isapp, WORD curr, char *pathname, char *pname, cha
             p = pathname;
     }
     strcpy(app_path, p);
-    p = filename_start(app_path);
+    p = shellutl_filename_start(app_path);
     *p = '\0';
 
     /* exit with error if we can't set the default directory */
@@ -913,7 +913,7 @@ WORD do_aopen(ANODE *pa, WORD isapp, WORD curr, char *pathname, char *pname, cha
          */
         if (!file_exists(pa->a_pappl, NULL))
         {
-            fun_alert_merge(1, STFILENF, filename_start(pa->a_pappl));
+            fun_alert_merge(1, STFILENF, shellutl_filename_start(pa->a_pappl));
             return FALSE;
         }
         /*
@@ -926,7 +926,7 @@ WORD do_aopen(ANODE *pa, WORD isapp, WORD curr, char *pathname, char *pname, cha
         if (pa->a_flags & AF_ISFULL)
         {
             strcpy(p,pathname); /* build full path string */
-            p = filename_start(p);
+            p = shellutl_filename_start(p);
         }
         strcpy(p,pname);        /* the filename always goes on the end */
         return pro_run(isgraf, pa->a_pappl, G.g_work, G.g_cwin, curr);
@@ -937,7 +937,7 @@ WORD do_aopen(ANODE *pa, WORD isapp, WORD curr, char *pathname, char *pname, cha
      * on to it.  first, build full pathname for pro_run() or show_file()
      */
     strcpy(app_path, pathname);
-    p = filename_start(app_path);
+    p = shellutl_filename_start(app_path);
     strcpy(p, pname);
 
     /*
@@ -1043,7 +1043,7 @@ WORD do_dopen(WORD curr)
     pw = win_alloc(curr);
     if (pw)
     {
-        build_root_path(path,drv);
+        shellutl_build_root_path(path,drv);
         strcpy(path+3,"*.*");
         if (!do_diropen(pw, TRUE, curr, path, (GRECT *)&G.g_screen[pw->w_root].ob_x, TRUE))
         {
@@ -1075,7 +1075,7 @@ void do_fopen(WNODE *pw, WORD curr, char *pathname, WORD allow_new_win)
 
     wind_get_grect(pw->w_id, WF_WXYWH, &t);
 
-    build_root_path(app_path,pathname[0]);
+    shellutl_build_root_path(app_path,pathname[0]);
     if (set_default_path(app_path) < 0L)    /* drive (no longer) valid? */
     {
         fun_close(pw, CLOSE_WINDOW);
@@ -1096,7 +1096,7 @@ void do_fopen(WNODE *pw, WORD curr, char *pathname, WORD allow_new_win)
         /*
          * handle renamed target of shortcut
          */
-        char *p = filename_start(app_path);
+        char *p = shellutl_filename_start(app_path);
         *p = '\0';
         if (set_default_path(app_path) == EPTHNF)
         {
@@ -1193,7 +1193,7 @@ WORD do_open(WORD curr)
 #if CONF_WITH_DESKTOP_SHORTCUTS
         if (pa->a_flags & AF_ISDESK)
         {
-            char *p = filename_start(pa->a_pdata);
+            char *p = shellutl_filename_start(pa->a_pdata);
             /* check for root folder */
             if ((pa->a_type == AT_ISFOLD) && (p == pa->a_pdata))
             {
@@ -1288,7 +1288,7 @@ WORD do_info(WORD curr)
                 pf = &fn;
                 memcpy(&pf->f_attr, &dta->d_attrib, 23);
                 strcpy(pathname, pa->a_pdata);
-                strcpy(filename_start(pathname),"*.*");
+                strcpy(shellutl_filename_start(pathname),"*.*");
                 pathptr = pathname;
             }
             else

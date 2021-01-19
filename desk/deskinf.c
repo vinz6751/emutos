@@ -512,7 +512,7 @@ WORD inf_file_folder(char *ppath, FNODE *pf)
 
     strcpy(srcpth, ppath);
     strcpy(dstpth, ppath);
-    nmidx = filename_start(srcpth) - srcpth;
+    nmidx = shellutl_filename_start(srcpth) - srcpth;
 
     /*
      * for folders, count the contents & insert the values in the

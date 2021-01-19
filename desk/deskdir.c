@@ -133,7 +133,7 @@ void draw_fld(OBJECT *tree, WORD obj)
  */
 void add_path(char *path, char *new_name)
 {
-    path = filename_start(path);
+    path = shellutl_filename_start(path);
     strcpy(path, new_name);
     strcat(path, "\\*.*");
 }
@@ -145,7 +145,7 @@ void add_path(char *path, char *new_name)
 static void sub_path(char *path)
 {
     /* scan to last segment in path */
-    path = filename_start(path);
+    path = shellutl_filename_start(path);
 
     /* now back up to previous directory in path */
     path -= 2;
@@ -164,7 +164,7 @@ static void sub_path(char *path)
  */
 char *add_fname(char *path, char *new_name)
 {
-    path = filename_start(path);
+    path = shellutl_filename_start(path);
 
     return strcpy(path, new_name);
 }
@@ -210,7 +210,7 @@ static WORD item_exists(char *path, BOOL is_folder)
  */
 void del_fname(char *pstr)
 {
-    strcpy(filename_start(pstr), "*.*");
+    strcpy(shellutl_filename_start(pstr), "*.*");
 }
 
 
@@ -238,7 +238,7 @@ static WORD d_dofdel(char *ppath)
         if (dos_delete(ppath) == 0)
             break;
 
-        switch(fun_alert_merge(1, STDELFIL, filename_start(ppath)))
+        switch(fun_alert_merge(1, STDELFIL, shellutl_filename_start(ppath)))
         {
         case 1:     /* skip */
             return -1;
@@ -270,7 +270,7 @@ static WORD d_dofoldel(char *ppath)
         if (dos_rmdir(ppath) == 0)
             break;
 
-        switch(fun_alert_merge(1, STDELDIR, filename_start(ppath)))
+        switch(fun_alert_merge(1, STDELDIR, shellutl_filename_start(ppath)))
         {
         case 1:     /* skip */
             return -1;
@@ -330,8 +330,8 @@ static WORD output_fname(char *psrc_file, char *pdst_file)
          * the user wants to be notified about overwrites, so we need
          * to tell the user: get i/p & o/p filenames and prefill dialog
          */
-        fmt_str(filename_start(psrc_file), ml_fsrc);    /* get input filename */
-        fmt_str(filename_start(pdst_file), ml_fdst);    /* get output filename */
+        fmt_str(shellutl_filename_start(psrc_file), ml_fsrc);    /* get input filename */
+        fmt_str(shellutl_filename_start(pdst_file), ml_fdst);    /* get output filename */
         inf_sset(tree, CACURRNA, ml_fsrc);
         inf_sset(tree, CACOPYNA, ml_fdst);
 
@@ -399,7 +399,7 @@ static WORD d_dofcopy(char *psrc_file, char *pdst_file, WORD time, WORD date, WO
         error = dos_open(psrc_file, 0);
         if (error >= 0)
             break;
-        switch(fun_alert_merge(1, STOPFAIL, filename_start(psrc_file)))
+        switch(fun_alert_merge(1, STOPFAIL, shellutl_filename_start(psrc_file)))
         {
         case 1:     /* skip */
             return -1;
@@ -428,7 +428,7 @@ static WORD d_dofcopy(char *psrc_file, char *pdst_file, WORD time, WORD date, WO
         error = dos_create(pdst_file, attr);
         if (error >= 0)
             break;
-        switch(fun_alert_merge(1, STCRTFIL, filename_start(pdst_file)))
+        switch(fun_alert_merge(1, STCRTFIL, shellutl_filename_start(pdst_file)))
         {
         case 1:     /* skip */
             dos_close(srcfh);
@@ -484,7 +484,7 @@ static WORD d_dofcopy(char *psrc_file, char *pdst_file, WORD time, WORD date, WO
             file = pdst_file;
         }
         /* Skip or Abort ? */
-        rc = (fun_alert_merge(1, alert, filename_start(file))==1) ? -1 : 0;
+        rc = (fun_alert_merge(1, alert, shellutl_filename_start(file))==1) ? -1 : 0;
     }
 
     dos_close(srcfh);       /* close files */
@@ -567,7 +567,7 @@ WORD d_doop(WORD level, WORD op, char *psrc_path, char *pdst_path, OBJECT *tree,
                 break;
             case OP_DELETE:
             case OP_MOVE:
-                ptmp = filename_start(psrc_path) - 1;
+                ptmp = shellutl_filename_start(psrc_path) - 1;
                 *ptmp = '\0';
                 more = d_dofoldel(psrc_path);
                 if (more > 0)
@@ -700,7 +700,7 @@ static WORD get_new_name(char *dstpth)
     OBJECT *tree = desk_rs_trees[ADCPALER];
     WORD ob;
 
-    fmt_str(filename_start(dstpth), ml_fsrc);   /* extract current folder name */
+    fmt_str(shellutl_filename_start(dstpth), ml_fsrc);   /* extract current folder name */
     strcpy(ml_fdst,ml_fsrc);            /* pre-fill new folder name */
     inf_sset(tree, CACURRNA, ml_fsrc);  /* and put both in dialog */
     inf_sset(tree, CACOPYNA, ml_fdst);
@@ -815,9 +815,9 @@ static WORD d_dofoldren(char *oldname, char *newname)
 {
     char *p;
 
-    p = filename_start(oldname) - 1;    /* remove trailing wildcards */
+    p = shellutl_filename_start(oldname) - 1;    /* remove trailing wildcards */
     *p = '\0';
-    p = filename_start(newname) - 1;
+    p = shellutl_filename_start(newname) - 1;
     *p = '\0';
 
     return d_dofileren(oldname,newname,TRUE);

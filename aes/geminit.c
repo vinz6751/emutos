@@ -427,7 +427,7 @@ static BOOL process_inf2(BOOL *isauto)
             while (*pcurr && (*pcurr != '@'))
                 ++pcurr;
             *pcurr = 0;
-            tmpptr2 = sh_name(tmpptr1);
+            tmpptr2 = shellutl_get_filename_part(tmpptr1);
             *(tmpptr2-1) = 0;
             KDEBUG(("Found #Z entry in EMUDESK.INF: path=%s, prg=%s\n",tmpptr1,tmpptr2));
 

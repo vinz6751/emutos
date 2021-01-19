@@ -154,7 +154,7 @@ WORD sh_write(WORD doex, WORD isgem, WORD isover, const char *pcmd, const char *
         psh->sh_nextapp = (strcmp(pcmd, DEF_CONSOLE) == 0) ? CONSOLE_APP : NORMAL_APP;
         psh->sh_isgem = (isgem != FALSE);
         if (psh->sh_nextapp == NORMAL_APP)
-            sh_curdrvdir(sh_apdir);     /* save app's current directory */
+            shellutl_get_current_drive_and_dir(sh_apdir);     /* save app's current directory */
         break;
 #if CONF_WITH_SHUTDOWN
     case SHW_SHUTDOWN:  /* shutdown system */
@@ -303,7 +303,7 @@ static WORD findfile(char *pspec)
     char *pname;
 
     KDEBUG(("sh_find(): input pspec='%s'\n",pspec));
-    pname = sh_name(pspec);                 /* get ptr to name      */
+    pname = shellutl_get_filename_part(pspec);     /* get ptr to name      */
 
     dos_sdta(&D.g_dta);
 
@@ -350,7 +350,7 @@ static WORD findfile(char *pspec)
 
     while(1)
     {
-        path = sh_path(path, D.g_work, pname);
+        path = shellutl_get_path_components(path, pname, D.g_work);
         if (!path)                  /* end of PATH= */
             break;
         if (dos_sfirst(D.g_work, FA_RO | FA_HIDDEN | FA_SYSTEM) == 0)   /* found */
@@ -476,7 +476,7 @@ static void set_default_desktop(SHELL *psh)
 
 static WORD sh_ldapp(SHELL *psh)
 {
-    char *fname = sh_name(D.s_cmd);     /* filename portion of program */
+    char *fname = shellutl_get_filename_part(D.s_cmd);  /* filename portion of program */
     LONG ret;
 
     KDEBUG(("sh_ldapp: Starting %s, sh_nextapp=%d, sh_isgem=%d\n",

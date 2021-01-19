@@ -216,7 +216,7 @@ BOOL add_one_level(char *pathname,char *folder)
     if (plen+flen+1 >= MAXPATHLEN)
         return FALSE;
 
-    p = filename_start(pathname);
+    p = shellutl_filename_start(pathname);
     strcpy(filename,p);     /* save filename portion */
     strcpy(p,folder);       /* & copy in folder      */
     p += flen;
@@ -238,7 +238,7 @@ static void remove_one_level(char *pathname)
     char *stop = pathname+2;    /* the first path separator */
     char *filename, *prev;
 
-    filename = filename_start(pathname);
+    filename = shellutl_filename_start(pathname);
     if (filename-1 <= stop)     /* already at the root */
         return;
 
@@ -449,7 +449,7 @@ static BOOL search_recursive(WORD curr, char *pathname, char *searchwild)
     /*
      * check if there is a filename match; if so, display the folder
      */
-    p = filename_start(pathname);
+    p = shellutl_filename_start(pathname);
     strcpy(p, searchwild);
     ret = dos_sfirst(pathname, DISPATTR);
     strcpy(p, "*.*");
@@ -527,7 +527,7 @@ static BOOL search_icon(WORD win, WORD curr, char *searchwild)
         {
             WNODE *temp = win_find(win);
             strcpy(pathname, temp->w_pnode.p_spec);
-            strcpy(filename_start(pathname), pf->f_name);
+            strcpy(shellutl_filename_start(pathname), pf->f_name);
         }
         break;
     case AT_ISDISK:
@@ -639,7 +639,7 @@ void fun_mask(WNODE *pw)
     /*
      * get current filemask & insert in dialog
      */
-    maskptr = filename_start(pw->w_pnode.p_spec);
+    maskptr = shellutl_filename_start(pw->w_pnode.p_spec);
     set_tedinfo_name(tree, FMMASK, maskptr);
 
     /*
@@ -745,7 +745,7 @@ static BOOL fun_print(WORD sobj, LONG bufsize, char *iobuf)
     {
         pw = win_find(G.g_cwin);    /* build the path */
         strcpy(path, pw->w_pnode.p_spec);
-        strcpy(filename_start(path), pf->f_name);
+        strcpy(shellutl_filename_start(path), pf->f_name);
     }
     else        /* it's a desktop icon */
     {
@@ -858,7 +858,7 @@ void fun_close(WNODE *pw, WORD closetype)
     if (closetype != CLOSE_WINDOW)
     {
         strcpy(pathname,pw->w_pnode.p_spec);
-        fname = filename_start(pathname);
+        fname = shellutl_filename_start(pathname);
         if (closetype == CLOSE_TO_ROOT)
             strcpy(pathname+3,fname);
         else if (pathname+3 == fname)
@@ -1011,7 +1011,7 @@ static WORD fun_file2desk(PNODE *pn_src, WORD icontype_src, ANODE *an_dest, WORD
 
             /* build pathname for do_aopen() */
             strcpy(pathname,an_dest->a_pdata);
-            strcpy(filename_start(pathname),"*.*");
+            strcpy(shellutl_filename_start(pathname),"*.*");
 
             /* set global so desktop will exit if do_aopen() succeeds */
             exit_desktop = do_aopen(an_dest, 1, dobj, pathname, an_dest->a_pappl, tail);
@@ -1081,7 +1081,7 @@ static WORD fun_file2win(PNODE *pn_src, char  *spec, ANODE *an_dest, FNODE *fn_d
 
     strcpy(pathname, spec);
 
-    p = filename_start(pathname);
+    p = shellutl_filename_start(pathname);
 
     if (an_dest && an_dest->a_type == AT_ISFOLD)
     {
@@ -1136,7 +1136,7 @@ static WORD fun_file2any(WORD sobj, WNODE *wn_dest, ANODE *an_dest, FNODE *fn_de
 #endif
     {
         ib_src = (ICONBLK *)G.g_screen[sobj].ob_spec;
-        build_root_path(path, ib_src->ib_char);
+        shellutl_build_root_path(path, ib_src->ib_char);
         strcat(path,"*.*");
     }
 
@@ -1356,7 +1356,7 @@ void fun_del(WORD sobj)
                 strcpy(path, pa->a_pdata);
                 break;
             case AT_ISDISK:
-                build_root_path(path, pa->a_letter);
+                shellutl_build_root_path(path, pa->a_letter);
                 strcat(path,"*.*");
                 break;
             default:        /* "can't happen" */

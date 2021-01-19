@@ -487,7 +487,7 @@ WORD ins_app(WORD curr)
         ANODE *temppa;
 
         strcpy(pathname,pa->a_pdata);   /* get path for app_afind_by_name() */
-        p = filename_start(pathname);
+        p = shellutl_filename_start(pathname);
         *p = '\0';
         temppa = app_afind_by_name(AT_ISFILE,AF_ISDESK|AF_WINDOW,pathname,pa->a_pappl,&isapp);
         if (temppa)
@@ -509,7 +509,7 @@ WORD ins_app(WORD curr)
     if (installed)
     {
         p = pa->a_pappl;
-        q = filename_start(p);
+        q = shellutl_filename_start(p);
         pfname = q;
     }
     else
@@ -524,7 +524,7 @@ WORD ins_app(WORD curr)
         if (pa->a_flags & AF_ISDESK)
         {
             p = pa->a_pdata;
-            q = filename_start(p);
+            q = shellutl_filename_start(p);
             pfname = pa->a_pappl;
         }
         else
@@ -532,7 +532,7 @@ WORD ins_app(WORD curr)
         {
             pw = win_find(G.g_cwin);
             p = pw->w_pnode.p_spec;
-            q = filename_start(p);
+            q = shellutl_filename_start(p);
             pfname = pf->f_name;
         }
     }
@@ -1252,7 +1252,7 @@ void ins_shortcut(WORD wh, WORD mx, WORD my)
          * build the full pathname
          */
         p = pw->w_pnode.p_spec;
-        q = filename_start(p);
+        q = shellutl_filename_start(p);
         strlcpy(pathname,p,q-p+1);  /* copy pathname including trailing backslash */
         strcat(pathname,pf->f_name);
 
