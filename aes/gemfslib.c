@@ -31,6 +31,7 @@
 #include "gemobed.h"
 #include "string.h"
 #include "intmath.h"
+#include "shellutl.h"
 
 #define NM_NAMES (F9NAME-F1NAME+1)
 #define NAME_OFFSET F1NAME
@@ -479,24 +480,6 @@ static WORD path_changed(char *path)
         return 1;
 
     return 0;
-}
-
-
-/*
- *  get drive number from specified path (if possible) or default
- */
-static WORD get_drive(char *path)
-{
-    char c;
-
-    if (path[1] == ':')     /* drive letter is present */
-    {
-        c = toupper(path[0]);
-        if ((c >= 'A') && (c <= 'Z'))
-            return c - 'A';
-    }
-
-    return dos_gdrv();
 }
 
 

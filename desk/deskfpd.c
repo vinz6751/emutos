@@ -25,6 +25,7 @@
 #include "optimize.h"
 #include "optimopt.h"
 #include "gemerror.h"
+#include "shellutl.h"
 
 #include "deskbind.h"
 #include "deskglob.h"

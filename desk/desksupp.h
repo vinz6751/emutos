@@ -15,7 +15,6 @@
 #define CTL_Q   ('Q'-0x40)
 #define CTL_S   ('S'-0x40)
 
-void build_root_path(char *path, WORD drive);
 void deselect_all(OBJECT *tree);
 void desk_busy_off(void);
 void desk_busy_on(void);
@@ -39,7 +38,6 @@ BOOL print_file(char *name, LONG bufsize, char *iobuf);
 void refresh_drive(WORD drive);
 void refresh_window(WNODE *pw, BOOL force_mediach);
 ANODE *i_find(WORD wh, WORD item, FNODE **ppf, WORD *pisapp);
-WORD set_default_path(char *path);
 BOOL valid_drive(char drive);
 
 #if CONF_WITH_DESKTOP_SHORTCUTS

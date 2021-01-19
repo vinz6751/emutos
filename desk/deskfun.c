@@ -26,6 +26,7 @@
 #include "obdefs.h"
 #include "gemdos.h"
 #include "optimize.h"
+#include "shellutl.h"
 
 #include "aesdefs.h"
 #include "deskbind.h"

@@ -20,6 +20,7 @@
 
 #include "emutos.h"
 #include "string.h"
+#include "shellutl.h"
 
 #include "xbiosbind.h"
 #include "aesext.h"

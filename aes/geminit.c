@@ -52,6 +52,7 @@
 #include "aesdefs.h"
 #include "aesext.h"
 #include "aesstub.h"
+#include "shellutl.h"
 
 #include "string.h"
 #include "tosvars.h"
@@ -309,35 +310,6 @@ static void load_accs(WORD n)
 
     for (i = 0; i < n; i++)
         load_one_acc(&acc[i]);
-}
-
-
-/*
- *  Set default desktop path (root of current drive)
- */
-static void sh_curdir(char *ppath)
-{
-    *ppath++ = dos_gdrv() + 'A';
-    *ppath++ = ':';
-    *ppath++ = '\\';
-    *ppath = '\0';
-}
-
-
-/*
- *  Routine to read in the start of a file
- *
- *  returns: >=0  number of bytes read
- *           < 0  error code from dos_open()/dos_read()
- */
-static LONG readfile(char *filename, LONG count, char *buf)
-{
-    char    tmpstr[MAX_LEN];
-
-    strcpy(tmpstr, filename);
-    tmpstr[0] += dos_gdrv();            /* set the drive letter */
-
-    return dos_load_file(tmpstr, count, buf);
 }
 
 

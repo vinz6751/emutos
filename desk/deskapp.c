@@ -21,6 +21,7 @@
 
 #include "emutos.h"
 #include "string.h"
+#include "shellutl.h"
 #include "obdefs.h"
 #include "rsdefs.h"
 #include "aesdefs.h"

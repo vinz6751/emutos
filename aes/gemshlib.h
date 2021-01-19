@@ -21,9 +21,6 @@ void sh_get(void *pbuffer, WORD len);
 void sh_put(const void *pdata, WORD len);
 void sh_tographic(void);
 
-char *sh_name(char *ppath);
-void sh_envrn(char **ppath, const char *psrch);
-
 WORD sh_find(char *pspec);
 
 void sh_rdef(char *lpcmd, char *lpdir);

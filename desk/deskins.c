@@ -25,6 +25,7 @@
 
 #include "emutos.h"
 #include "string.h"
+#include "shellutl.h"
 #include "obdefs.h"
 #include "gemdos.h"
 #include "optimize.h"

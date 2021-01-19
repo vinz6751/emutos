@@ -24,6 +24,7 @@
 #include "intmath.h"
 #include "gemlib.h"
 #include "gem_rsc.h"
+#include "shellutl.h"
 
 #include "gemsuper.h"
 #include "gempd.h"
@@ -385,7 +386,7 @@ static UWORD crysbind(WORD opcode, AESGLOBAL *pglobal, WORD control[], WORD int_
         ret = sh_find((char *)SH_PATH);
         break;
     case SHEL_ENVRN:
-        sh_envrn((char **)SH_PATH, (const char *)SH_SRCH);
+        sh_envrn(ad_envrn, (char **)SH_PATH, (const char *)SH_SRCH);
         break;
 #if CONF_WITH_PCGEM
     case SHEL_RDEF:

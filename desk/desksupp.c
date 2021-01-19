@@ -31,6 +31,7 @@
 #include "xbiosbind.h"
 #include "gemerror.h"
 #include "cookie.h"
+#include "shellutl.h"
 
 #include "aesdefs.h"
 #include "deskbind.h"
@@ -1012,20 +1013,6 @@ WORD do_aopen(ANODE *pa, WORD isapp, WORD curr, char *pathname, char *pname, cha
 
 
 /*
- *  Build root path for specified drive
- */
-void build_root_path(char *path,WORD drive)
-{
-    char *p = path;
-
-    *p++ = drive;
-    *p++= ':';
-    *p++ = '\\';
-    *p = '\0';
-}
-
-
-/*
  *  Open a disk
  *
  *  if curr >= 0, it is a screen object id; the disk letter will be
@@ -1726,17 +1713,6 @@ ANODE *i_find(WORD wh, WORD item, FNODE **ppf, WORD *pisapp)
 
 
 /*
- *  Routine to change the default drive and directory
- */
-WORD set_default_path(char *path)
-{
-    dos_sdrv(path[0]-'A');
-
-    return (WORD)dos_chdir(path);
-}
-
-
-/*
  *  Check if specified drive letter is valid
  *
  *  if it is, return TRUE
@@ -1744,15 +1720,10 @@ WORD set_default_path(char *path)
  */
 BOOL valid_drive(char drive)
 {
-    int drv = drive - 'A';
     char drvstr[2];
-
-    drvstr[0] = drive;
-    drvstr[1] = '\0';
-
-    if ((drv >= 0) && (drv < BLKDEVNUM))
-        if (dos_sdrv(dos_gdrv()) & (1L << drv))
-            return TRUE;
+	
+	if (shellutl_is_drive_valid(drive,drvstr))
+		return TRUE;
 
     fun_alert_merge(1, STNODRIV, drvstr);
 

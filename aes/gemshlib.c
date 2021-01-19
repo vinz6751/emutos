@@ -51,6 +51,7 @@
 
 #include "gemshlib.h"
 #include "../desk/deskstub.h"
+#include "shellutl.h"
 
 #if WITH_CLI
 #include "../cli/clistub.h"
@@ -102,24 +103,6 @@ void sh_read(char *pcmd, char *ptail)
 {
     strcpy(pcmd, D.s_cmd);
     memcpy(ptail, ad_stail, CMDTAILSIZE);
-}
-
-
-static void sh_curdrvdir(char *ppath)
-{
-    WORD drive;
-
-    /* remember current directory */
-    drive = dos_gdrv();
-    *ppath++ = drive + 'A';
-    *ppath++ = ':';
-    *ppath = '\0';
-    dos_gdir(drive+1, ppath);
-    if (*ppath == '\0')
-    {
-        *ppath++ = '\\';
-        *ppath = '\0';
-    }
 }
 
 
@@ -298,94 +281,6 @@ static void sh_show(const char *lcmd)
 
 
 /*
- *  Return a pointer to the start of the filename in a path
- *  (assumed to be the last component of the path)
- */
-char *sh_name(char *ppath)
-{
-    char *pname = ppath;
-
-    /*
-     * note: filename_start() assumes that there is a filename separator
-     * within the path, so we handle a path like X:AAAAAAAA.BBB before
-     * calling the general function
-     */
-    if (ppath[0] && (ppath[1] == ':'))
-        pname += 2;
-
-    return filename_start(pname);
-}
-
-
-/*
- *  Search for a particular string in the DOS environment and return a
- *  value in the pointer pointed to by the first argument.  If the string
- *  is found, the value is a pointer to the first character after the
- *  string; otherwise it is a NULL pointer.
- */
-void sh_envrn(char **ppath, const char *psrch)
-{
-    char *p;
-    WORD len;
-
-    len = strlen(psrch);
-    *ppath = NULL;
-
-    /*
-     * scan environment string until double nul
-     */
-    for (p = ad_envrn; *p; )
-    {
-        if (strncmp(p, psrch, len) == 0)
-        {
-            *ppath = p + len;
-            break;
-        }
-        while(*p++) /* skip to end of current env variable */
-            ;
-    }
-}
-
-
-/*
- *  Search next style routine to pick up each path in the PATH= portion
- *  of the DOS environment.  It returns a pointer to the start of the
- *  following path until there are no more paths to find.
- */
-static char *sh_path(char *src, char *dest, char *pname)
-{
-    char last = 0;
-    char *p;
-
-    if (!src)           /* precautionary */
-        return NULL;
-
-    /* check for end of PATH= env var */
-    if (!*src)
-        return NULL;
-
-    /* copy over path */
-    for (p = src; *p; )
-    {
-        if ((*p == ';') || (*p == ','))
-            break;
-        last = *p;
-        *dest++ = *p++;
-    }
-
-    /* see if extra slash is needed */
-    if ((last != '\\') && (last != ':'))
-        *dest++ = '\\';
-
-    /* append file name */
-    strcpy(dest, pname);
-
-    /* point past terminating separator or nul */
-    return p + 1;
-}
-
-
-/*
  *  Routine to verify that a file is present.  Note that this routine
  *  tolerates the presence of wildcards in the filespec.
  *
@@ -444,7 +339,7 @@ static WORD findfile(char *pspec)
     }
 
     /* (4) search in the AES path */
-    sh_envrn(&path, PATH_ENV);      /* find PATH= in the command tail */
+    sh_envrn(ad_envrn, &path, PATH_ENV);      /* find PATH= in the command tail */
     if (!path)
     {
         KDEBUG(("sh_find(): no AES path, '%s' not found\n",pspec));
