@@ -12,6 +12,7 @@
 #include "cmd.h"
 #include "scancode.h"
 #include "string.h"
+#include "shellutl.h"
 
 /*
  *  local to this set of functions
@@ -49,7 +50,7 @@ char prompt[MAXPATHLEN];
 
     save_history_num = history_num;     /* so that edit_line() can play with it */
 
-    get_path(prompt,0);
+    shellutl_get_current_path_for_drive(prompt,0);
     message(prompt);
     message(">");
     while(1) {

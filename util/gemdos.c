@@ -61,12 +61,6 @@ WORD dos_conis(void)
 }
 
 
-WORD dos_gdrv(void)
-{
-    return Dgetdrv();
-}
-
-
 void dos_sdta(void *ldta)
 {
     Fsetdta(ldta);

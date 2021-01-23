@@ -19,24 +19,35 @@
 #include "gemdos.h"
 #include "shellutl.h"
 #include "sysconf.h"
+#include "bdosbind.h"
 
 #include <string.h>
 
-/*
- * Get current directory for the current drive.
- * opath is the output buffer.
- */
-void shellutl_get_current_drive_and_dir(char *opath)
-{
-	WORD drive;
 
-	drive = shellutl_get_current_drive_root(opath);
-	dos_gdir(drive+1, opath);
-	if (*opath == '\0')
-    {
-		*opath++ = '\\';
-		*opath = '\0';
+/*
+ *  Get specified drive's current path (including drive letter) into buffer
+ *
+ *  Note: drive is specified as for Dgetpath(): for current drive, use 0
+ *  otherwise use the drive number + 1
+ *
+ *  returns error code from Dgetpath()
+ */
+LONG shellutl_get_current_path_for_drive(char *buf, WORD drive)
+{
+	LONG rc;
+	char *p = buf;
+
+    *p++ = 'A' + (drive ? drive-1 : Dgetdrv());
+    *p++ = ':';
+    *p = '\0';
+
+    rc = Dgetpath(p,drive);
+    if (!*p) {          /* the root */
+        *p++ = '\\';
+        *p = '\0';
     }
+
+    return rc;
 }
 
 
@@ -104,6 +115,42 @@ char *shellutl_get_path_components(char *paths, const char *filename_to_append, 
 
 
 /*
+ *  copies next path component from buffer &
+ *  updates buffer pointer
+ *
+ *  returns:
+ *      1   arg is normal
+ *      0   no more args
+ */
+WORD shellutl_get_path_component(const char **pp,char *dest)
+{
+const char *p;
+char *q = dest;
+
+    /*
+     *  look for start of next component
+     */
+    for (p = *pp; *p; p++)
+        if (*p != ';')
+            break;
+    if (!*p) {          /* end of buffer */
+        *pp = p;
+        return 0;
+    }
+
+    while(*p) {
+        if (*p == ';' || *p ==',')
+            break;
+        *q++ = *p++;
+    }
+    *q = '\0';
+
+    *pp = p;
+    return 1;
+}
+
+
+/*
  * return pointer to start of last segment of path
  * (assumed to be the filename)
  */
@@ -133,7 +180,7 @@ WORD shellutl_get_drive(const char *path)
             return c - 'A';
     }
 
-    return dos_gdrv();
+    return Dgetdrv();
 }
 
 
@@ -144,7 +191,7 @@ WORD shellutl_get_current_drive_root(char *opath)
 {
 	WORD drive;
 
-	drive = dos_gdrv();
+	drive = Dgetdrv();
 	shellutl_build_root_path(opath,drive);
 
 	return drive;
@@ -250,7 +297,7 @@ LONG readfile(char *filename, LONG count, char *buf)
     char tmpstr[MAXPATHLEN]; /* VB: this was MAX_LEN in geminit.c */
 
     strcpy(tmpstr, filename);
-    tmpstr[0] += dos_gdrv();            /* set the drive letter */
+    tmpstr[0] += Dgetdrv();            /* set the drive letter */
 
     return dos_load_file(tmpstr, count, buf);
 }
@@ -261,7 +308,7 @@ LONG readfile(char *filename, LONG count, char *buf)
  */
 WORD set_default_path(char *path)
 {
-    dos_sdrv(path[0]-'A');
+    Dsetdrv(path[0]-'A');
 
     return (WORD)dos_chdir(path);
 }
@@ -269,20 +316,13 @@ WORD set_default_path(char *path)
 
 /*
  *  Check if specified drive letter is valid
- *
- *  if it is, return TRUE
- *  else issue form_alert and return FALSE
- *  drvstr is a buffer, should be at least 2 characters
  */
-BOOL shellutl_is_drive_valid(char drive, char *drvstr)
+BOOL shellutl_is_drive_valid(char drive)
 {
-    int drv = drive - 'A';
-
-    drvstr[0] = drive;
-    drvstr[1] = '\0';
+    int drv = (drive | 0x20) - 'a'; /* Force lower case */
 
     if ((drv >= 0) && (drv < BLKDEVNUM))
-        if (dos_sdrv(dos_gdrv()) & (1L << drv))
+        if (Dsetdrv(Dgetdrv()) & (1L << drv))
             return TRUE;
 
     return FALSE;

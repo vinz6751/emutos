@@ -17,6 +17,7 @@
 #include "gemlib.h"
 #include "gem_rsc.h"
 
+#include "bdosbind.h"
 #include "gemdos.h"
 #include "gemoblib.h"
 #include "gemfmlib.h"
@@ -518,7 +519,7 @@ WORD fs_input(char *pipath, char *pisel, WORD *pbutton, char *pilabel)
     if (*pipath == '\0')
     {
         strcpy(pipath,"A:\\*.*");
-        *pipath += dos_gdrv();
+        *pipath += Dgetdrv();
     }
 
     /*
@@ -631,7 +632,7 @@ WORD fs_input(char *pipath, char *pisel, WORD *pbutton, char *pilabel)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpragmas"
 #pragma GCC diagnostic ignored "-Wrestrict"
-                    sprintf(locstr,"%c:\\%s",'A'+dos_gdrv(),mask);
+                    sprintf(locstr,"%c:\\%s",'A'+(char)Dgetdrv(),mask);
 #pragma GCC diagnostic pop
                 }
                 select_drive(tree,shellutl_get_drive(locstr),TRUE);

@@ -153,7 +153,7 @@ WORD sh_write(WORD doex, WORD isgem, WORD isover, const char *pcmd, const char *
         psh->sh_nextapp = (strcmp(pcmd, DEF_CONSOLE) == 0) ? CONSOLE_APP : NORMAL_APP;
         psh->sh_isgem = (isgem != FALSE);
         if (psh->sh_nextapp == NORMAL_APP)
-            shellutl_get_current_drive_and_dir(sh_apdir);     /* save app's current directory */
+            shellutl_get_current_path_for_drive(sh_apdir,0);     /* save app's current directory */
         break;
 #if CONF_WITH_SHUTDOWN
     case SHW_SHUTDOWN:  /* shutdown system */
@@ -344,7 +344,7 @@ static WORD findfile(char *pspec)
         KDEBUG(("sh_find(): no AES path, '%s' not found\n",pspec));
         return 0;
     }
-    if (!*path)                     /* skip nul after PATH= */
+    if (!*path)      /* skip nul after PATH= if necessary (see TOS 1.04 release notes) */
         path++;
 
     while(1)

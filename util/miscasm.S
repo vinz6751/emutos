@@ -27,7 +27,7 @@ _trap1:
         move.l  t1regsav,d2
         move.l  t1regsav+4,a2
 #else
-        movem.l d2/a2,t1regsav
+        movem.l d2/a2,t1regsav  // must save a2/d2 because someone may intercept and clobber them
         trap    #1              // call bdos call
         movem.l t1regsav,d2/a2
 #endif

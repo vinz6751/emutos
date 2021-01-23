@@ -23,6 +23,7 @@
 #include "shellutl.h"
 
 #include "xbiosbind.h"
+#include "bdosbind.h"
 #include "aesext.h"
 #include "aesdefs.h"
 #include "biosext.h"
@@ -1876,7 +1877,7 @@ BOOL deskmain(void)
 #endif
 
     /* remember start drive */
-    G.g_stdrv = dos_gdrv();
+    G.g_stdrv = Dgetdrv();
 
     /* initialize libraries */
     gl_apid = appl_init();

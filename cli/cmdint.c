@@ -11,6 +11,7 @@
  */
 #include "cmd.h"
 #include "string.h"
+#include "shellutl.h"
 
 typedef struct {
     const char *name;
@@ -34,7 +35,6 @@ PRIVATE void help_display(const COMMAND *p);
 PRIVATE WORD help_lines(const COMMAND *p);
 PRIVATE WORD help_pause(void);
 PRIVATE WORD help_wanted(const COMMAND *p,char *cmd);
-PRIVATE LONG is_valid_drive(char drive_letter);
 PRIVATE void output(const char *s);
 PRIVATE void outputnl(const char *s);
 PRIVATE LONG outputbuf(const char *s,LONG len,WORD paging);
@@ -214,7 +214,7 @@ char *p;
 WORD current_drive, temp_drive;
 
     if (argc == 1) {                /* just output current path */
-        rc = get_path(path,0);
+        rc =  shellutl_get_current_path_for_drive(path,0);
         outputnl(path);
         return rc;
     }
@@ -236,11 +236,11 @@ WORD current_drive, temp_drive;
      */
     p = argv[1];
     if (*(p+1) == ':') {
-        if (!is_valid_drive(*p))
+        if (!shellutl_is_drive_valid(*p))
             return EDRIVE;
         temp_drive = (*p|0x20) - 'a';
         if (*(p+2) == '\0') {       /* cd x: */
-            rc = get_path(path,temp_drive+1);
+            rc = shellutl_get_current_path_for_drive(path,temp_drive+1);
             outputnl(path);
             return rc;
         }
@@ -485,7 +485,7 @@ LONG rc = 0L;
     }
 
     for (p = argv[1]; *p; ) {
-        if (!get_path_component(&p,temp))
+        if (!shellutl_get_path_component(&p,temp))
             break;
         rc = check_path_component(temp);
         if (rc < 0L)
@@ -508,7 +508,7 @@ PRIVATE LONG run_pwd(WORD argc,char **argv)
 char buf[MAXPATHLEN];
 LONG rc;
 
-    rc = get_path(buf,0);
+    rc = shellutl_get_current_path_for_drive(buf,0);
     outputnl(buf);
 
     return rc;
@@ -516,7 +516,7 @@ LONG rc;
 
 PRIVATE LONG run_ren(WORD argc,char **argv)
 {
-    return Frename(0,argv[1],argv[2]);
+    return Frename(argv[1],argv[2]);
 }
 
 PRIVATE LONG run_rm(WORD argc,char **argv)
@@ -574,7 +574,7 @@ LONG rc;
 
 PRIVATE LONG run_setdrv(WORD argc,char **argv)
 {
-    if (!is_valid_drive(argv[0][0]))
+    if (!shellutl_is_drive_valid(argv[0][0]))
         return EDRIVE;
 
     strlower(argv[0]);
@@ -931,31 +931,6 @@ LONG bufsize, n, rc;
     return rc;
 }
 
-/*
- *  get specified drive's current path (including drive letter) into buffer
- *
- *  Note: drive is specified as for Dgetpath(): for current drive,
- *  use 0, otherwise use the drive number + 1
- *
- *  returns error code from Dgetpath()
- */
-LONG get_path(char *buf,WORD drive)
-{
-LONG rc;
-char *p = buf;
-
-    *p++ = 'A' + (drive ? drive-1 : Dgetdrv());
-    *p++ = ':';
-    *p = '\0';
-
-    rc = Dgetpath(p,drive);
-    if (!*p) {          /* the root */
-        *p++ = '\\';
-        *p = '\0';
-    }
-
-    return rc;
-}
 
 /*
  *  extract a path from a pathname
@@ -1116,18 +1091,6 @@ char buf[80], *p = buf;
     outputnl(buf);
 }
 
-PRIVATE LONG is_valid_drive(char drive_letter)
-{
-ULONG drvbits;
-WORD drive_number;
-
-    drvbits = Dsetdrv(Dgetdrv());
-    drive_number = (drive_letter | 0x20) - 'a';
-    if ((drive_number < 0) || (drive_number >= BLKDEVNUM))
-        return 0;
-
-    return (drvbits & (1L << drive_number)) ? 1 : 0;
-}
 
 /*
  *  checks a pathname
@@ -1147,7 +1110,7 @@ LONG rc;
      * for "X:" and "X:\" directory specifications
      */
     if (component[1] == ':') {
-        if (!is_valid_drive(*component))
+        if (!shellutl_is_drive_valid(*component))
             return EDRIVE;
         p = component + 2;
         if (*p == '\\')

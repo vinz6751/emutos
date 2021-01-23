@@ -30,6 +30,7 @@
 #include "xbiosbind.h"
 #include "has.h"
 #include "biosext.h"
+#include "bdosbind.h"
 
 #include "gemgsxif.h"
 #include "gemdosif.h"
@@ -652,7 +653,7 @@ void run_accs_and_desktop(void)
     gl_bclick = 0x0;
 
     strcpy(D.g_scrap, SCRAP_DIR_NAME);
-    D.g_scrap[0] = dos_gdrv() + 'A';/* set up scrap dir path */
+    D.g_scrap[0] = Dgetdrv() + 'A';/* set up scrap dir path */
 
     gsx_init();                     /* do gsx open work station */
 

@@ -1493,7 +1493,7 @@ void do_format(void)
     /*
      * enable button(s) for existent drives, disable for non-existent
      */
-    drivebits = dos_sdrv(dos_gdrv()) & 0x0003;  /* floppy devices */
+    drivebits = dos_sdrv(Dgetdrv()) & 0x0003;  /* floppy devices */
     for (i = 0, obj = &tree[FMT_DRVA]; i < 2; i++, obj++, drivebits >>= 1)
     {
         if (drivebits & 0x0001)
@@ -1722,8 +1722,11 @@ BOOL valid_drive(char drive)
 {
     char drvstr[2];
 	
-	if (shellutl_is_drive_valid(drive,drvstr))
+	if (shellutl_is_drive_valid(drive))
 		return TRUE;
+
+	drvstr[0] = drive;
+	drvstr[1] = '\0';
 
     fun_alert_merge(1, STNODRIV, drvstr);
 

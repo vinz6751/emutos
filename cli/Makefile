@@ -34,7 +34,7 @@ HEADERS = cmd.h
 .PRECIOUS: $(TARGET) $(OBJECTS)
 
 $(TARGET): $(OBJECTS)
-	$(CC) $(OBJECTS) -Wall $(LIBS) -s -o $@
+	$(CC) $(OBJECTS) ../obj/shellutl.o -Wall $(LIBS) -s -o $@
 
 clean:
 	-rm -f *.o version.c

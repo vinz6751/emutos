@@ -295,7 +295,7 @@ BOOL ins_devices(void)
     BOOL change = FALSE;
     ANODE *pa;
 
-    current = dos_sdrv(dos_gdrv());     /* all current devices */
+    current = dos_sdrv(Dgetdrv());     /* all current devices */
 
     /*
      * scan ANODEs and build bitmask of installed devices

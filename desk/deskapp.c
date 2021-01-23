@@ -29,6 +29,7 @@
 #include "intmath.h"
 #include "gsxdefs.h"
 #include "gemdos.h"
+#include "bdosbind.h"
 #include "gemerror.h"
 #include "optimize.h"
 
@@ -686,7 +687,7 @@ static void build_inf(char *infbuf, WORD xcnt, WORD ycnt)
     p = infbuf + sizeof(desk_inf_data1) - 1;
 
     /* Scan for valid drives: */
-    drivemask = dos_sdrv(dos_gdrv());
+    drivemask = dos_sdrv(Dgetdrv());
     for (i = 0; i < BLKDEVNUM; i++)
     {
         if (drivemask&(1L<<i))
