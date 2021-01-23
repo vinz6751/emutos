@@ -30,7 +30,6 @@
 
 #include "portab.h"
 
-
 /*
  * system calls
  */
