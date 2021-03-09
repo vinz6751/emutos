@@ -419,6 +419,11 @@ static void bios_init(void)
     KDEBUG(("snd_init()\n"));
     snd_init();         /* Reset Soundchip, deselect floppies */
 
+    if (FIRST_BOOT)
+	    coldbootsound();
+    else
+        warmbootsound();
+
     /*
      * Initialise the two ACIA devices (MIDI and KBD), then initialise
      * the associated IORECs & vectors
