@@ -463,5 +463,7 @@ WORD initinfo(ULONG *pshiftbits)
 
 void display_startup_msg(void)
 {
+#if MPS_DISPLAY_VERSION_INFO
     cprintf("EmuTOS Version %s\r\n", version);
+#endif
 }

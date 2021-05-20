@@ -45,10 +45,18 @@ static void setphys(const UBYTE *addr);
 /* Define palette */
 
 static const UWORD dflt_palette[] = {
+#if MPS_BLACK_DARK_THEME
     RGB_BLACK, RGB_RED, RGB_WHITE, RGB_YELLOW,
+#else 
+    RGB_WHITE, RGB_RED, RGB_GREEN, RGB_YELLOW,
+#endif
     RGB_BLUE, RGB_MAGENTA, RGB_CYAN, RGB_LTGRAY,
     RGB_GRAY, RGB_LTRED, RGB_LTGREEN, RGB_LTYELLOW,
+#if MPS_BLACK_DARK_THEME
     RGB_LTBLUE, RGB_LTMAGENTA, RGB_LTCYAN, RGB_GREEN
+#else
+    RGB_LTBLUE, RGB_LTMAGENTA, RGB_LTCYAN, RGB_BLACK
+#endif
 };
 
 /*
@@ -60,7 +68,7 @@ static void initialise_ste_palette(UWORD mask)
     int i;
 
     for (i = 0; i < 16; i++)
-        col_regs[i] = dflt_palette[i] & mask;
+        col_regs[i] =  dflt_palette[i] & mask;
 }
 
 /*

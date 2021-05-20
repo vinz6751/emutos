@@ -13,6 +13,14 @@
 #define CONF_WITH_PRINTER_ICON 0
 #define CONF_WITH_VDI_VERTLINE 1
 
+/* Display the version at cold boot */
+#define MPS_DISPLAY_VERSION_INFO 0
+
+/* Black background at boot */
+#define MPS_BLACK_DARK_THEME 1
+
+/* Desktop background */
+#define MPS_DESK_BACKGROUND_COLOR 318, 379, 818
 
 /* If blitter is available, always use it and remove software drawing routines. */
 /* #define MPS_BLITTER_ALWAYS_ON 1 */
@@ -22,8 +30,8 @@
 /* #define MPS_STE_SOUND_ONLY */
 
 /* These are mutually exclusive */
-#define MPS_STF 1
-#define MPS_STE 0
+#define MPS_STF 0
+#define MPS_STE 1
 
 #if MPS_STF
   /* STf have no blitter so remove related code.

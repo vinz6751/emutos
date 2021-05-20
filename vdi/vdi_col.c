@@ -50,7 +50,7 @@ static const WORD st_palette[16][3] =
     { 1000, 1000, 1000 },
     { 0, 0, 0 },
     { 1000, 0, 0 },
-    { 318, 574, 818 }, /* Green in TOS */
+    { MPS_DESK_BACKGROUND_COLOR }, /* Green in TOS */
     { 0, 0, 1000 },
     { 0, 1000, 1000 },
     { 1000, 1000, 0 },
