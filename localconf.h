@@ -12,6 +12,7 @@
 #define CONF_WITH_EASTER_EGG 0
 #define CONF_WITH_PRINTER_ICON 0
 #define CONF_WITH_VDI_VERTLINE 1
+#define CONF_WITH_ULTRASATAN_CLOCK 1
 
 /* Display the version at cold boot */
 #define MPS_DISPLAY_VERSION_INFO 0
@@ -21,6 +22,8 @@
 
 /* Desktop background */
 #define MPS_DESK_BACKGROUND_COLOR 318, 379, 818
+
+
 
 /* If blitter is available, always use it and remove software drawing routines. */
 /* #define MPS_BLITTER_ALWAYS_ON 1 */

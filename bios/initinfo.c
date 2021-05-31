@@ -46,14 +46,21 @@
 
 #define INFO_LENGTH 40      /* width of info lines (must fit in low-rez) */
 #define LOGO_LENGTH 34      /* must equal length of strings in EmuTOS logo */
-
+#define MPS_LOGO 1
 static const char logo[][LOGO_LENGTH+1] =
+#if MPS_LOGO
+{"331313311333113     22  22   2  2",
+"313131313131333    6  6 6 6  66 6",
+"353535355335533 77 6666 6  6 6 66",
+"313331313333313    4  4 4 4  4  4",
+"313331313331133    4  4 44   4  4"};
+#else
     { "11111111111 7777777777  777   7777",
       "1                  7   7   7 7    ",
       "1111   1 1  1   1  7   7   7  777 ",
       "1     1 1 1 1   1  7   7   7     7",
       "11111 1   1  111   7    777  7777 " };
-
+#endif
 /* Print n spaces */
 static void print_spaces(WORD n)
 {

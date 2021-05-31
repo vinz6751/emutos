@@ -37,7 +37,8 @@ endif
 # overridden by a string containing date and commit id.
 #
 #VERSION = $(subst $(space),.,$(tempversion))
-VERSION = MPS-$(shell date +%Y%m%d)
+VERSION = JBFou $(subst $(space),.,$(tempversion))
+#$(shell date +%Y%m%d)
 
 #
 # this is stored in the EmuTOS 'extended os header'.  a zero value
