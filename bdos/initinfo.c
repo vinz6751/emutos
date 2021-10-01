@@ -6,6 +6,7 @@
  * Authors:
  *  MAD     Martin Doering
  *  PES     Petr Stehlik
+ *  VB      Vincent Barrilliot
  *
  * This file is distributed under the GPL, version 2 or at your
  * option any later version.  See doc/license.txt for details.
@@ -88,7 +89,6 @@ static void set_margin(void)
 
 /* Paint the logo using as little ROM space as possible. */
 static const char block[] = "\033c%c "; /* Block of color 'c' (leave bg colour dirty) */ 
-#define COLOR_OFFSET ('0'+1)
 static void print_art(void)
 {
     char c;
@@ -100,18 +100,18 @@ static void print_art(void)
         if (c < 0)
         {   
             while (c++)
-                cprintf(block, *r - COLOR_OFFSET);
+                cprintf(block, *r - LOGO_COLOR_OFFSET);
         }
         else 
         {
-            if (c == ('\n'+1))
+            if (c == LOGO_CRLF)
             {
-                cprintf(block, 0);
+                cprintf(block, 0); /* Restore bg colour */
                 crlf();
                 set_margin();
             }
             else
-                cprintf(block, c - COLOR_OFFSET);
+                cprintf(block, c - LOGO_COLOR_OFFSET);
         }
     }
     cprintf(block, 0);
