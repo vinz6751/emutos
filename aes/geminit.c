@@ -809,7 +809,7 @@ void gem_main(void)
         n = 0L;
     infbuf[n] = '\0';           /* terminate input data */
 
-    if (!gl_changerez != NO_RES_CHANGE) /* can't be here because of rez change,       */
+    if (gl_changerez == NO_RES_CHANGE) /* can't be here because of rez change,       */
         process_inf_res_change();         /*  so see if .inf says we need to change rez */
 
     if (gl_changerez != NO_RES_CHANGE) {
@@ -837,7 +837,8 @@ void gem_main(void)
         dos_sdrv(bootdev);
     }
 
-    ml_ocnt = 0;
+    /* form library initialization */
+    fm_init();
 
     gl_changerez = NO_RES_CHANGE;
 
