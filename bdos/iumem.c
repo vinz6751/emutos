@@ -32,7 +32,7 @@ long ccfreeit;
 /*
  *  ffit - find first fit for requested memory in ospool
  */
-MD *ffit(long amount, MPB *mp)
+MD *ffit(LONG amount, MPB *mp)
 {
     MD *p, *q, *p1;     /* free list is composed of MD's */
     LONG maxval;
