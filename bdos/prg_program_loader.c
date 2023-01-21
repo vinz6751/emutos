@@ -8,6 +8,8 @@
  * option any later version.  See doc/license.txt for details.
  */
 
+/* #define ENABLE_KDEBUG */
+
 #include "program_loader.h"
 #include "gemerror.h"
 #include "config.h"
@@ -35,12 +37,12 @@ typedef struct
 static LONG pgfix01(UBYTE *lastcp, LONG nrelbytes, const PGMINFO *pi);
 
 
-static WORD can_load(FH fh)
+static WORD can_load(const LOAD_STATE *lstate)
 {
     WORD r;
     WORD magic_maybe;
 
-    r = xread(fh, SIZEOF_MAGIC, &magic_maybe);
+    r = lstate->prg_reader->read(lstate->fh, SIZEOF_MAGIC, &magic_maybe);
     if (r < 0L)
         return r;
     if (r != SIZEOF_MAGIC)
@@ -50,7 +52,7 @@ static WORD can_load(FH fh)
 }
 
 
-static WORD get_program_info(FH fh, LOAD_STATE *lstate)
+static WORD get_program_info(LOAD_STATE *lstate)
 {
     WORD r;
     PGMHDR01 *header;
@@ -60,7 +62,7 @@ static WORD get_program_info(FH fh, LOAD_STATE *lstate)
         return ENSMEM;
 
     /* load program header (can_load skipped the magic) */
-    r = xread(fh, (LONG)sizeof(PGMHDR01), header);
+    r = lstate->prg_reader->read(lstate->fh, (LONG)sizeof(PGMHDR01), header);
     if (r < 0L)
         return r;
     if (r != (LONG)sizeof(PGMHDR01))
@@ -86,7 +88,7 @@ static WORD get_program_info(FH fh, LOAD_STATE *lstate)
  * - call pgfix01() to fix up the code using that info
  * - zero out the bss
  */
-static LONG prg_load_program_into_memory(FH fh, PD *p, LOAD_STATE *lstate)
+static LONG prg_load_program_into_memory(PD *p, LOAD_STATE *lstate)
 {
     /* Aliases */
     PGMHDR01 *hd = (PGMHDR01*)lstate->data;
@@ -120,7 +122,7 @@ static LONG prg_load_program_into_memory(FH fh, PD *p, LOAD_STATE *lstate)
     memcpy(&p->p_tbase, &(pi.pi_tbase), 6 * sizeof(long));
 
     /* read TEXT and DATA section into memory */
-    r = xread(fh, flen, pi.pi_tbase);
+    r = lstate->prg_reader->read(lstate->fh, flen, pi.pi_tbase);
     if (r < 0)
         return r;
 
@@ -138,11 +140,11 @@ static LONG prg_load_program_into_memory(FH fh, PD *p, LOAD_STATE *lstate)
         /* the 0x1c comes from the fact that the text segment image doesn't come immediately
          * after the program header, but one word after: there is a 2-byte padding after ABSFLAG
          * and before the TEXT section's content that we need to skip. */ 
-        r = xlseek(flen + hd->h01_slen + sizeof(PGMHDR01) + sizeof(UWORD), fh, 0);
+        r = lstate->prg_reader->seek(flen + hd->h01_slen + sizeof(PGMHDR01) + sizeof(UWORD), lstate->fh, 0);
         if (r < 0L)
             return r;
 
-        r = xread(fh,(long)sizeof(relst),&relst);
+        r = lstate->prg_reader->read(lstate->fh,(long)sizeof(relst),&relst);
 
         KDEBUG(("BDOS load_program_into_memory: relst=0x%lx\n",relst));
 
@@ -165,7 +167,7 @@ static LONG prg_load_program_into_memory(FH fh, PD *p, LOAD_STATE *lstate)
             for ( ; ; )
             {
                 /*  read in more relocation info  */
-                r = xread(fh, flen, pi.pi_bbase);
+                r = lstate->prg_reader->read(lstate->fh, flen, pi.pi_bbase);
                 if (r <= 0)
                     break;
 
@@ -325,7 +327,7 @@ LONG kpgm_relocate(PD *p, long length)
 #endif
 
 
-PROGRAM_LOADER prg_program_loader = {
+const PROGRAM_LOADER prg_program_loader = {
     can_load,
     get_program_info,
     prg_load_program_into_memory

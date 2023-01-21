@@ -14,7 +14,7 @@
  * option any later version.  See doc/license.txt for details.
  */
 
-#define ENABLE_KDEBUG
+// #define ENABLE_KDEBUG
 
 #include "emutos.h"
 #include "bdosdefs.h"
@@ -28,6 +28,7 @@
 #include "asm.h"
 #include "has.h"
 #include "program_loader.h"
+#include "program_reader.h"
 #include "sysconf.h"
 
 
@@ -43,6 +44,7 @@
 static void ixterm(PD *r);
 static WORD envsize(const char *env );
 static void init_pd_files(PD *p);
+static void deinit_pd_files(PD *r);
 static PD *alloc_pd_tpa_and_setup_env(LOAD_STATE *lstate, const char *tail, const char *env);
 static void proc_go(PD *p);
 
@@ -110,27 +112,7 @@ static void free_all_owned(PD *p, MPB *mpb)
  */
 static void ixterm(PD *r)
 {
-    WORD h;
-    WORD i;
-
-    /* check the standard devices in both file tables  */
-
-    for (i = 0; i < NUMSTD; i++)
-        if ((h = r->p_uft[i]) > 0)
-            xclose(h);
-
-    for (i = 0; i < OPNFILES; i++)
-        if (r == sft[i].f_own)
-            xclose(i+NUMSTD);
-
-
-    /* decrement usage counts for current directories */
-
-    for (i = 0; i < NUMCURDIR; i++)
-    {
-        if ((h = r->p_curdir[i]) != 0)
-            decr_curdir_usage(h);
-    }
+    deinit_pd_files(r);
 
     /* free each item in the allocated list that is owned by 'r' */
 
@@ -167,9 +149,9 @@ static WORD envsize(const char *env)
  * create psp - user receives a memory partition
  *
  * @flg: 0: load&go, 3: load/nogo, 4: justgo, 5: create psp, 6: ???
- * @s:   command
- * @t:   tail
- * @v:   environment
+ * @path:   command
+ * @tail:   tail
+ * @env:   environment
  */
 
 /* these variables are used to avoid the following warning:
@@ -182,9 +164,8 @@ long xexec(WORD flag, char *path, char *tail, char *env)
     PD *p;
     LOAD_STATE lstate;
     LONG rc;
-    FH fh;
 
-    KDEBUG(("BDOS xexec: flag or mode = %d\n",flag));
+    KDEBUG(("BDOS xexec: flag or mode = %d, '%s'\n",flag, path ? path : ""));
 
     /* first branch - actions that do not require loading files */
     switch (flag) {
@@ -231,57 +212,69 @@ long xexec(WORD flag, char *path, char *tail, char *env)
         FALLTHROUGH;
     
     case PE_GO:
+        KDEBUG(("GO %s\n", path?path:"(null)"));
         p = (PD *) tail;
         proc_go(p);
         /* should not return ? */
         return (long)p;
     
     case PE_LOADGO:
+        KDEBUG(("LOADANDGO %s\n", path?path:"(null)"));
         FALLTHROUGH;
     
     case PE_LOAD:
+        KDEBUG(("LOAD %s\n", path?path:"(null)"));
         break;
     
     default:
+        KDEBUG(("Unknown mode %d\n", flag));
         return EINVFN;
     }
 
     /* we now need to load a file */
-    KDEBUG(("BDOS xexec: trying to find %s\n",path));
-    if (ixsfirst(path,0,0L)) {
-        KDEBUG(("BDOS xexec: command %s not found!!!\n",path));
-        return EFILNF;      /*  file not found      */
+    KDEBUG(("BDOS xexec: trying to find %s\n", path?path:"(null)"));
+
+    lstate.prg_reader = (PROGRAM_READER*)&file_program_reader;
+    if (!lstate.prg_reader->exists(path)) {
+        lstate.prg_reader = (PROGRAM_READER*)&rom_program_reader;
+        if (!lstate.prg_reader->exists(path)) {
+            KDEBUG(("BDOS xexec: command %s not found!!!\n",path));
+            return EFILNF;      /*  file not found      */
+        }
     }
+    KDEBUG(("Program reader: %s\n", lstate.prg_reader == &file_program_reader ? "FILE": lstate.prg_reader == &rom_program_reader ? "ROM" : "NOT FOUND"));
 
     /* attempt to open the file */
-    rc = xopen(path, 0);
+    rc = lstate.prg_reader->open(path, 0);
     if (rc < 0) {
         KDEBUG(("BDOS xexec: cannot open %s\n",path));
         return rc;
     }
-    fh = (FH) rc;
+    lstate.fh = (FH)rc;
 
     /* memory ownership - the owner is either the new process being created, or the parent */
     lstate.owner = (flag == PE_LOADGO) ? 0L/*means "child"*/ : run;
 
     /* prepare a loader and allocate the memory it needs */
     lstate.data = NULL;
-    lstate.loader = find_program_loader(fh);
-    if (lstate.loader) {
+    find_program_loader(&lstate);
+    if (lstate.loader == NULL) {
         KDEBUG(("BDOS xexec: no suitable program loader found\n"));
         rc = EPLFMT;
 abort_load: /* to save ROM space we reuse that piece of code  in case of error*/
         if (lstate.data)
             xmfree(lstate.data);
-        xclose(fh);
+        lstate.prg_reader->close(lstate.fh);
         return rc;
     }
+    else
+        KDEBUG(("PROGRAM LOADER FOUND: %p\n", lstate.loader));
 
     /* load the header - if I/O error occurs now, the longjmp in rwabs will
      * jump directly back to bdosmain.c, which is not a problem because
      * we haven't allocated anything yet.    <--- NOT TRUE WE MAY HAVE lstate.data !
      */
-    rc = lstate.loader->get_program_info(fh, &lstate);
+    rc = lstate.loader->get_program_info(&lstate);
     if (rc) {
         KDEBUG(("BDOS xexec: read_program_header returned %ld (0x%lx)\n",rc,rc));
         goto abort_load;
@@ -309,7 +302,7 @@ abort_load: /* to save ROM space we reuse that piece of code  in case of error*/
         /* free any memory allocated so far & close the file */
         xmfree(cur_p->p_env);
         xmfree(cur_p);
-        xclose(fh);
+        lstate.prg_reader->close(lstate.fh);
 
         /* we still have to jump back to bdosmain.c so that the proper error
          * handling can occur.
@@ -318,7 +311,7 @@ abort_load: /* to save ROM space we reuse that piece of code  in case of error*/
     }
 
     /* now, load the rest of the program, perform relocation, close the file */
-    rc = lstate.loader->load_program_into_memory(fh, cur_p, &lstate);
+    rc = lstate.loader->load_program_into_memory(cur_p, &lstate);
     if (rc) {
         KDEBUG(("BDOS xexec: load_program_into_memory returned %ld (0x%lx)\n",rc,rc));
         /* free any memory allocated yet */
@@ -348,7 +341,7 @@ abort_load: /* to save ROM space we reuse that piece of code  in case of error*/
 }
 
 
-/* duplicate files */
+/* duplicate file handles */
 static void init_pd_files(PD *p)
 {
     int i;
@@ -372,6 +365,30 @@ static void init_pd_files(PD *p)
 
     /* and current drive */
     p->p_curdrv = run->p_curdrv;
+}
+
+static void deinit_pd_files(PD *r)
+{
+    WORD h;
+    WORD i;
+
+    /* check the standard devices in both file tables  */
+
+    for (i = 0; i < NUMSTD; i++)
+        if ((h = r->p_uft[i]) > 0)
+            xclose(h);
+
+    for (i = 0; i < OPNFILES; i++)
+        if (r == sft[i].f_own)
+            xclose(i+NUMSTD);
+
+    /* decrement usage counts for current directories */
+
+    for (i = 0; i < NUMCURDIR; i++)
+    {
+        if ((h = r->p_curdir[i]) != 0)
+            decr_curdir_usage(h);
+    }
 }
 
 /*
@@ -507,7 +524,7 @@ UBYTE *alloc_tpa(ULONG flags, LONG needed, LONG *allocated_size
         if (alt_ram_available) {
             *allocated_size = alt_ram_size;
 #if CONF_WITH_NON_RELOCATABLE_SUPPORT
-            md = (LONG)find_first_large_enough_free_block(alt_ram_size, &pmdalt, start_address);
+            md = find_first_large_enough_free_block(alt_ram_size, &pmdalt, start_address);
 #else
             md = ffit(alt_ram_size, &pmdalt);
 #endif
@@ -520,7 +537,7 @@ UBYTE *alloc_tpa(ULONG flags, LONG needed, LONG *allocated_size
         *allocated_size = st_ram_size;
         /* take the largest free block */
 #if CONF_WITH_NON_RELOCATABLE_SUPPORT
-        md = (LONG)find_first_large_enough_free_block(st_ram_size, &pmd, start_address);
+        md = find_first_large_enough_free_block(st_ram_size, &pmd, start_address);
 #else
         md = ffit(st_ram_size, &pmd);
 #endif
@@ -566,7 +583,8 @@ static void proc_go(PD *p)
 {
     struct gouser_stack *sp;
 
-    KDEBUG(("BDOS xexec: trying to load (and execute) a process on %p ...\n",p->p_tbase));
+    KDEBUG(("BDOS xexec: trying to load (and execute) a process on %p ...\n", p->p_tbase));
+
     p->p_parent = run;
 
     /* create a stack at the end of the TPA */
