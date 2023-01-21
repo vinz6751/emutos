@@ -28,10 +28,10 @@ void find_program_loader(LOAD_STATE* lstate) {
     lstate->loader = NULL;
 
     for (i = 0; i < sizeof(program_loaders)/sizeof(PROGRAM_LOADER*); i++) {
-        PROGRAM_LOADER* loader = program_loaders[i];
+        const PROGRAM_LOADER* const loader = program_loaders[i];
         r = loader->can_load(lstate);
         if (r == 1) {
-            lstate->loader = loader;
+            lstate->loader = (PROGRAM_LOADER*)loader;
             return;
         }
         else if (r == 0)
