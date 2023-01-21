@@ -31,13 +31,13 @@
  * Arguments:
  * p - ptr to PD
  * h - file handle opened by read_program_header
- * hd - the program header read by read_program_header
+ * lstate - the program loading state/context
  */
 LONG load_program_into_memory(PD *p, FH h, LOAD_STATE *lstate)
 {
     LONG r;
 
-    r = lstate->loader->load_program_into_memory(h, p, lstate);
+    r = lstate->loader->load_program_into_memory(p, lstate);
 
     KDEBUG(("BDOS load_program_into_memory: return code=0x%lx\n",r));
 

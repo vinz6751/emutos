@@ -15,6 +15,8 @@
 #ifndef KPRINT_H
 #define KPRINT_H
 
+#include "config.h"
+
 /* console output */
 int cprintf(const char *RESTRICT fmt, ...) PRINTF_STYLE;
 

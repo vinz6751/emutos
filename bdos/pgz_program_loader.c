@@ -35,12 +35,12 @@ typedef struct {
 } SEGMENT_HDR;
 
 
-static WORD can_load(FH fh)
+static WORD can_load(const LOAD_STATE *lstate)
 {
     WORD r;
     char magic_maybe;
 
-    r = xread(fh, SIZEOF_MAGIC, &magic_maybe);
+    r = lstate->prg_reader->read(lstate->fh, SIZEOF_MAGIC, &magic_maybe);
     if (r < 0L)
         return r;
     if (r != SIZEOF_MAGIC)
@@ -49,7 +49,7 @@ static WORD can_load(FH fh)
     return magic_maybe == 'z' || magic_maybe == 'Z';
 }
 
-static WORD get_program_info(FH fh, LOAD_STATE *lstate) {
+static WORD get_program_info(LOAD_STATE *lstate) {
     lstate->relocatable_size = 0L;
     lstate->flags = PF_STANDARD;
     return E_OK;
@@ -65,7 +65,7 @@ static ULONG word24to32(const UBYTE *b) {
     return r;
 } 
 
-static LONG pgz_load_program_into_memory(FH fh, PD *pd, LOAD_STATE *lstate)
+static LONG pgz_load_program_into_memory(PD *pd, LOAD_STATE *lstate)
 {
     SEGMENT_HDR seghdr;
     LONG size;
@@ -78,7 +78,7 @@ static LONG pgz_load_program_into_memory(FH fh, PD *pd, LOAD_STATE *lstate)
 
     for (segcount = 0; segcount < sizeof(segadr)/sizeof(UBYTE*) ; segcount++)
     {
-        r = xread(fh, sizeof(SEGMENT_HDR), &seghdr);
+        r = lstate->prg_reader->read(lstate->fh, sizeof(SEGMENT_HDR), &seghdr);
         if (r < sizeof(SEGMENT_HDR))
             return EPLFMT;
         
@@ -96,7 +96,7 @@ static LONG pgz_load_program_into_memory(FH fh, PD *pd, LOAD_STATE *lstate)
         segadr[segcount++] = dst->m_start;
         
         /* read segment into memory */
-        r = xread(fh, size , dst->m_start);
+        r = lstate->prg_reader->read(lstate->fh, size , dst->m_start);
         if (r < 0L)
             return r;
         if (r != size)
@@ -110,7 +110,7 @@ static LONG pgz_load_program_into_memory(FH fh, PD *pd, LOAD_STATE *lstate)
     return ENSMEM;
 }
 
-PROGRAM_LOADER pgz_program_loader = {
+const PROGRAM_LOADER pgz_program_loader = {
     can_load,
     get_program_info,
     pgz_load_program_into_memory
