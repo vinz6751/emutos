@@ -13,7 +13,6 @@
 #ifndef PROC_H
 #define PROC_H
 
-#include "pghdr.h"
 #include "program_loader.h"
 #include "sysconf.h"
 

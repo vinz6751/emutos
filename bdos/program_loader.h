@@ -3,11 +3,10 @@
 
 #include "portab.h"
 #include "fs.h"
-#include "pghdr.h"
 #include "program_reader.h"
 
 typedef struct load_state_t {
-    struct program_loader_t *loader;
+    struct program_loader_t * loader;
 
     /* This provides methods for reading the program from disk/rom */
     PROGRAM_READER *prg_reader;

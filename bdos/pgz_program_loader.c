@@ -17,7 +17,6 @@
 #include "fs.h"
 #include "kprint.h"
 #include "mem.h"
-#include "pghdr.h"
 #include "proc.h"
 #include "string.h"
 #include "sysconf.h"
