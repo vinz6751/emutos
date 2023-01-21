@@ -36,8 +36,20 @@ typedef struct
     UBYTE   *pi_bbase;    /*  start addr of bss  seg      */
 } PGMINFO;
 
-static LONG pgfix01(UBYTE *lastcp, LONG nrelbytes, const PGMINFO *pi);
+/* Represents the header of a program on disk, TOS native format. */
+typedef struct
+{
+        /*  magic number is already skipped as can_load returns 2 */
+        LONG    h01_tlen ;      /*  length of text segment    */
+        LONG    h01_dlen ;      /*  length of data segment    */
+        LONG    h01_blen ;      /*  length of bss  segment    */
+        LONG    h01_slen ;      /*  length of symbol table    */
+        LONG    h01_res1 ;      /*  reserved - always zero    */
+        ULONG   h01_flags ;     /*  flags                     */
+        WORD    h01_abs ;       /*  not zero if no relocation */
+} PGMHDR01;
 
+static LONG pgfix01(UBYTE *lastcp, LONG nrelbytes, const PGMINFO *pi);
 
 static WORD can_load(const LOAD_STATE *lstate)
 {
