@@ -404,6 +404,7 @@ static void add_slow_ram(void)
     if (size == 0)
         return;
 
+    KDEBUG(("Slow RAM detected at %p, size=%lu\n", start, size));
     bmem_register(start, size);
 }
 
@@ -422,6 +423,7 @@ static void add_processor_slot_fast_ram(void)
     if (size == 0)
         return;
 
+    KDEBUG(("Processor Slot Fast RAM detected at %p, size=%lu\n", start, size));
     bmem_register((void*)start, size);
 }
 
@@ -441,6 +443,7 @@ static void add_motherboard_fast_ram(void)
     if (size == 0)
         return;
 
+    KDEBUG(("Motherboard Fast RAM detected at %p, size=%lu\n", end - size, size));
     bmem_register((void *)end - size, size);
 }
 
@@ -476,6 +479,7 @@ static void add_alt_ram_from_loader(void)
     {
         UBYTE *address = altram_regions[i].address;
         ULONG size = altram_regions[i].size;
+        KDEBUG(("xmaddalt(%p, %lu)\n", address, size));
         bmem_register((void *)address, size);
     }
 }
