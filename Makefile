@@ -289,7 +289,7 @@ bios_src += lowstram.c
 # Other BIOS sources can be put in any order
 bios_src +=  memory.S processor.S vectors.S aciavecs.S bios.c xbios.c acsi.c \
              biosmem.c blkdev.c chardev.c clock.c conout.c country.c \
-             disk.c dma.c dmasound.c floppy.c font.c ide.c ikbd.c initinfo.c \
+             disk.c dma.c dmasound.c floppy.c font.c ide.c ikbd.c \
              kprint.c kprintasm.S linea.S lineainit.c lineavars.S machine.c \
              mfp.c midi.c mouse.c natfeat.S natfeats.c nvram.c panicasm.S \
              parport.c screen.c serport.c sound.c videl.c vt52.c xhdi.c \
@@ -309,7 +309,9 @@ endif
 
 bdos_src = bdosmain.c console.c fsbuf.c fsdir.c fsdrive.c fsfat.c fsglob.c \
            fshand.c fsio.c fsmain.c fsopnclo.c iumem.c kpgmld.c osmem.c \
-           proc.c rwa.S time.c umem.c
+           proc.c rwa.S time.c umem.c initinfo.c bootstrap.c logo.c \
+		   program_loader.c prg_program_loader.c pgz_program_loader.c \
+		   program_reader.c
 
 #
 # source code in util/
@@ -350,7 +352,7 @@ aes_src = gemasm.S gemstart.S gemdosif.S gemaplib.c gemasync.c gemctrl.c \
           gemfslib.c gemgraf.c gemgrlib.c gemgsxif.c geminit.c geminput.c \
           gemmnext.c gemmnlib.c gemobed.c gemobjop.c gemoblib.c gempd.c gemqueue.c \
           gemrslib.c gemsclib.c gemshlib.c gemsuper.c gemwmlib.c gemwrect.c \
-          gsx2.c gem_rsc.c mforms.c
+          gsx2.c gem_rsc.c mforms.c aescfg.c shellutl.c
 
 #
 # source code in desk/
@@ -522,6 +524,7 @@ NODEP += 192
 $(ROM_192): ROMSIZE = 192
 $(ROM_192): emutos.img mkrom
 	./mkrom pad $(ROMSIZE)k $< $(ROM_192)
+	@cp etos192$(UNIQUE).img mpts192$(UNIQUE).img
 
 #
 # 256kB Image
@@ -539,6 +542,7 @@ NODEP += 256
 	@MEMBOT=$(call SHELL_SYMADDR,__end_os_stram,emutos.map);\
 	echo "# RAM used: $$(($$MEMBOT)) bytes ($$(($$MEMBOT - $(MEMBOT_TOS206))) bytes more than TOS 2.06)"
 	@printf "$(LOCALCONFINFO)"
+	@cp etos256$(UNIQUE).img $(UNIQUE).img
 
 $(ROM_256): ROMSIZE = 256
 $(ROM_256): emutos.img mkrom
@@ -1041,6 +1045,19 @@ $(ICONRSCGEN_BASE)%c $(ICONRSCGEN_BASE)%h: ird $(ICONRSC_BASE)%rsc $(ICONRSC_BAS
 	./ird -picon $(ICONRSC_BASE) $(ICONRSCGEN_BASE)
 $(MFORMRSCGEN_BASE)%c $(MFORMRSCGEN_BASE)%h: mrd $(MFORMRSC_BASE)%rsc $(MFORMRSC_BASE)%def
 	./mrd -pmform $(MFORMRSC_BASE) $(MFORMRSCGEN_BASE)
+
+#
+# Logo support
+#
+
+TOCLEAN += logo_compressor
+NODEP += logo_compressor
+LOGO_BASE = bdos/logo
+GEN_SRC += $(LOGO_BASE).c $(LOGO_BASE).h
+logo_compressor: tools/logo_compressor.c
+	$(NATIVECC) $< -o $@
+$(LOGO_BASE)%c $(LOGO_BASE)%h: logo_compressor
+	./logo_compressor $(LOGO_BASE).c $(LOGO_BASE).h
 
 #
 # Special ROM support

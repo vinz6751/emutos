@@ -8,12 +8,13 @@
  *  MAD     Martin Doering
  *  ACH     ???
  *  LVL     Laurent Vogel
+ *  VB      Vincent Barrilliot
  *
  * This file is distributed under the GPL, version 2 or at your
  * option any later version.  See doc/license.txt for details.
  */
 
-/* #define ENABLE_KDEBUG */
+#define ENABLE_KDEBUG
 
 #include "emutos.h"
 #include "bdosdefs.h"
@@ -26,6 +27,9 @@
 #include "biosext.h"
 #include "asm.h"
 #include "has.h"
+#include "program_loader.h"
+#include "program_reader.h"
+#include "sysconf.h"
 
 
 /*
@@ -37,12 +41,11 @@
  * forward prototypes
  */
 
-static void ixterm( PD *r );
-static WORD envsize( char *env );
-static void init_pd_fields(PD *p, char *tail, long max, char *envptr);
+static void ixterm(PD *r);
+static WORD envsize(const char *env );
 static void init_pd_files(PD *p);
-static char *alloc_env(ULONG flags, char *v);
-static UBYTE *alloc_tpa(ULONG flags,LONG needed,LONG *avail);
+static void deinit_pd_files(PD *r);
+static PD *alloc_pd_tpa_and_setup_env(LOAD_STATE *lstate, const char *tail, const char *env);
 static void proc_go(PD *p);
 
 /*
@@ -109,27 +112,7 @@ static void free_all_owned(PD *p, MPB *mpb)
  */
 static void ixterm(PD *r)
 {
-    WORD h;
-    WORD i;
-
-    /* check the standard devices in both file tables  */
-
-    for (i = 0; i < NUMSTD; i++)
-        if ((h = r->p_uft[i]) > 0)
-            xclose(h);
-
-    for (i = 0; i < OPNFILES; i++)
-        if (r == sft[i].f_own)
-            xclose(i+NUMSTD);
-
-
-    /* decrement usage counts for current directories */
-
-    for (i = 0; i < NUMCURDIR; i++)
-    {
-        if ((h = r->p_curdir[i]) != 0)
-            decr_curdir_usage(h);
-    }
+    deinit_pd_files(r);
 
     /* free each item in the allocated list that is owned by 'r' */
 
@@ -147,12 +130,12 @@ static void ixterm(PD *r)
  * counts bytes starting at 'env' up to and including the terminating
  * double null.
  */
-static WORD envsize(char *env)
+static WORD envsize(const char *env)
 {
     char *e;
     WORD cnt;
 
-    for (e = env, cnt = 0; !(*e == '\0' && *(e+1) == '\0'); ++e, ++cnt)
+    for (e = (char*)env, cnt = 0; !(*e == '\0' && *(e+1) == '\0'); ++e, ++cnt)
         ;
 
     return cnt + 2;         /*  count terminating double null  */
@@ -166,9 +149,9 @@ static WORD envsize(char *env)
  * create psp - user receives a memory partition
  *
  * @flg: 0: load&go, 3: load/nogo, 4: justgo, 5: create psp, 6: ???
- * @s:   command
- * @t:   tail
- * @v:   environment
+ * @path:   command
+ * @tail:   tail
+ * @env:   environment
  */
 
 /* these variables are used to avoid the following warning:
@@ -178,20 +161,16 @@ static PD *cur_p;
 
 long xexec(WORD flag, char *path, char *tail, char *env)
 {
-    PD *p, *owner;
-    PGMHDR01 hdr;
-    char *env_ptr;
-    ULONG hdrflags;
+    PD *p;
+    LOAD_STATE lstate;
     LONG rc;
-    long max, needed;
-    FH fh;
 
-    KDEBUG(("BDOS xexec: flag or mode = %d\n",flag));
+    KDEBUG(("BDOS xexec: flag or mode = %d, '%s'\n",flag, path ? path : ""));
 
     /* first branch - actions that do not require loading files */
-    switch(flag) {
+    switch (flag) {
 #if DETECT_NATIVE_FEATURES
-    case PE_RELOCATE:   /* internal use only, see bootstrap() in bios/bios.c */
+    case PE_RELOCATE:   /* internal use only, see natfeat_bootstrap() in bdos/bootstrap.c */
         p = (PD *) tail;
         rc = kpgm_relocate(p, (long)path);
         if (rc) {
@@ -210,107 +189,106 @@ long xexec(WORD flag, char *path, char *tail, char *env)
     case PE_BASEPAGE:           /* just create a basepage */
         path = (char *) 0L;     /* (same as basepage+flags with flags set to zero) */
         FALLTHROUGH;
+    
     case PE_BASEPAGEFLAGS:      /* create a basepage, respecting the flags */
-        hdrflags = (ULONG)path;
-        env_ptr = alloc_env(hdrflags, env);
-        if (env_ptr == NULL) {
-            KDEBUG(("BDOS xexec: no memory for environment\n"));
-            return ENSMEM;
-        }
-        p = (PD *)alloc_tpa((ULONG)path,sizeof(PD),&max);
+        lstate.flags = (ULONG)path;
+        lstate.owner = run;
+        lstate.relocatable_size = 0;
 
-        if (p == NULL) {    /* not even enough memory for basepage */
-            xmfree(env_ptr);
-            KDEBUG(("BDOS xexec: No memory for basepage\n"));
+        p = alloc_pd_tpa_and_setup_env(&lstate, tail, env);
+        if (p == NULL)
             return ENSMEM;
-        }
-
-        /* memory ownership */
-        set_owner(p, run);
-        set_owner(env_ptr, run);
 
         /* initialize the PD */
-        init_pd_fields(p, tail, max, env_ptr);
-        p->p_flags = (ULONG)path;   /* set the flags */
+        p->p_flags = lstate.flags;   /* set the flags */
         init_pd_files(p);
 
         return (long)p;
+    
     case PE_GOTHENFREE:
         /* set the owner of the memory to be this process */
         p = (PD *) tail;
         set_owner(p, p);
-        set_owner(p->p_env, p);
         FALLTHROUGH;
+    
     case PE_GO:
+        KDEBUG(("GO %s\n", path?path:"(null)"));
         p = (PD *) tail;
         proc_go(p);
         /* should not return ? */
         return (long)p;
+    
     case PE_LOADGO:
+        KDEBUG(("LOADANDGO %s\n", path?path:"(null)"));
+        FALLTHROUGH;
+    
     case PE_LOAD:
+        KDEBUG(("LOAD %s\n", path?path:"(null)"));
         break;
+    
     default:
+        KDEBUG(("Unknown mode %d\n", flag));
         return EINVFN;
     }
 
     /* we now need to load a file */
-    KDEBUG(("BDOS xexec: trying to find %s\n",path));
-    if (ixsfirst(path,0,0L)) {
-        KDEBUG(("BDOS xexec: command %s not found!!!\n",path));
-        return EFILNF;      /*  file not found      */
+    KDEBUG(("BDOS xexec: trying to find %s\n", path?path:"(null)"));
+
+    lstate.prg_reader = (PROGRAM_READER*)&file_program_reader;
+    if (!lstate.prg_reader->exists(path)) {
+        lstate.prg_reader = (PROGRAM_READER*)&rom_program_reader;
+        if (!lstate.prg_reader->exists(path)) {
+            KDEBUG(("BDOS xexec: command %s not found!!!\n",path));
+            return EFILNF;      /*  file not found      */
+        }
     }
+    KDEBUG(("Program reader: %s\n", lstate.prg_reader == &file_program_reader ? "FILE": lstate.prg_reader == &rom_program_reader ? "ROM" : "NOT FOUND"));
 
     /* attempt to open the file */
-    rc = xopen(path, 0);
+    rc = lstate.prg_reader->open(path, 0);
     if (rc < 0) {
         KDEBUG(("BDOS xexec: cannot open %s\n",path));
         return rc;
     }
-    fh = (FH) rc;
+    lstate.fh = (FH)rc;
+
+    /* memory ownership - the owner is either the new process being created, or the parent */
+    lstate.owner = (flag == PE_LOADGO) ? 0L/*means "child"*/ : run;
+
+    /* prepare a loader and allocate the memory it needs */
+    lstate.data = NULL;
+    find_program_loader(&lstate);
+    if (lstate.loader == NULL) {
+        KDEBUG(("BDOS xexec: no suitable program loader found\n"));
+        rc = EPLFMT;
+abort_load: /* to save ROM space we reuse that piece of code  in case of error*/
+        if (lstate.data)
+            xmfree(lstate.data);
+        lstate.prg_reader->close(lstate.fh);
+        return rc;
+    }
+    else
+        KDEBUG(("PROGRAM LOADER FOUND: %p\n", lstate.loader));
 
     /* load the header - if I/O error occurs now, the longjmp in rwabs will
      * jump directly back to bdosmain.c, which is not a problem because
-     * we haven't allocated anything yet.
+     * we haven't allocated anything yet.    <--- NOT TRUE WE MAY HAVE lstate.data !
      */
-    rc = kpgmhdrld(fh, &hdr);
+    rc = lstate.loader->get_program_info(&lstate);
     if (rc) {
-        KDEBUG(("BDOS xexec: kpgmhdrld returned %ld (0x%lx)\n",rc,rc));
-        xclose(fh);
-        return rc;
+        KDEBUG(("BDOS xexec: read_program_header returned %ld (0x%lx)\n",rc,rc));
+        goto abort_load;
     }
 
-    /* allocate the environment first, depending on memory policy */
-    env_ptr = alloc_env(hdr.h01_flags, env);
-    if (env_ptr == NULL) {
-        KDEBUG(("BDOS xexec: no memory for environment\n"));
-        xclose(fh);
-        return ENSMEM;
-    }
-
-    /* allocate the basepage depending on memory policy */
-    needed = hdr.h01_tlen + hdr.h01_dlen + hdr.h01_blen + sizeof(PD);
-    p = (PD *)alloc_tpa(hdr.h01_flags,needed,&max);
-
-    /* if failed, free env_ptr and return */
+    p = alloc_pd_tpa_and_setup_env(&lstate, tail, env);
     if (p == NULL) {
-        KDEBUG(("BDOS xexec: no memory for TPA\n"));
-        xmfree(env_ptr);
-        xclose(fh);
-        return ENSMEM;
+        KDEBUG(("BDOS xexec: no memory for PD and environment\n"));
+        rc = ENSMEM;
+        goto abort_load;
     }
-
-    /* memory ownership - the owner is either the new process being created,
-     * or the parent
-     */
-    owner = (flag == PE_LOADGO) ? p : run;
-    set_owner(p, owner);
-    set_owner(env_ptr, owner);
-
-    /* initialize the fields in the PD structure */
-    init_pd_fields(p, tail, max, env_ptr);
-
-    /* set the flags (must be done after init_pd) */
-    p->p_flags = hdr.h01_flags;
+ 
+    /* set the flags */
+    p->p_flags = lstate.flags;
 
     /* use static variable to avoid the obscure longjmp warning */
     cur_p = p;
@@ -324,7 +302,7 @@ long xexec(WORD flag, char *path, char *tail, char *env)
         /* free any memory allocated so far & close the file */
         xmfree(cur_p->p_env);
         xmfree(cur_p);
-        xclose(fh);
+        lstate.prg_reader->close(lstate.fh);
 
         /* we still have to jump back to bdosmain.c so that the proper error
          * handling can occur.
@@ -333,14 +311,13 @@ long xexec(WORD flag, char *path, char *tail, char *env)
     }
 
     /* now, load the rest of the program, perform relocation, close the file */
-    rc = kpgmld(cur_p, fh, &hdr);
+    rc = lstate.loader->load_program_into_memory(cur_p, &lstate);
     if (rc) {
-        KDEBUG(("BDOS xexec: kpgmld returned %ld (0x%lx)\n",rc,rc));
+        KDEBUG(("BDOS xexec: load_program_into_memory returned %ld (0x%lx)\n",rc,rc));
         /* free any memory allocated yet */
         xmfree(cur_p->p_env);
         xmfree(cur_p);
-
-        return rc;
+        goto abort_load;
     }
 
     /* at this point the program has been correctly loaded in memory, and
@@ -349,46 +326,27 @@ long xexec(WORD flag, char *path, char *tail, char *env)
      */
     init_pd_files(cur_p);
 
+    xmfree(lstate.data);
+
     /* invalidate instruction cache for the TEXT segment only
      * programs that jump into their DATA, BSS or HEAP are kindly invited
      * to do their cache management themselves.
      */
-    invalidate_instruction_cache(((UBYTE *)cur_p) + sizeof(PD), hdr.h01_tlen);
+    invalidate_instruction_cache(lstate.prg_entry_point, cur_p->p_tlen); /* Assumes only one text segment */
 
     if (flag != PE_LOAD)
         proc_go(cur_p);
+
     return (long)cur_p;
 }
 
-/* initialize the structure fields */
-static void init_pd_fields(PD *p, char *tail, long max, char *envptr)
-{
-    int i;
-    char *b;
 
-    /* first, zero it out */
-    bzero(p, sizeof(PD)) ;
-
-    /* memory values */
-    p->p_lowtpa = (UBYTE *)p;              /*  M01.01.06   */
-    p->p_hitpa  = (UBYTE *)p  +  max;      /*  M01.01.06   */
-    p->p_xdta = (DTA *) p->p_cmdlin;       /* default p_xdta is p_cmdlin */
-    p->p_env = envptr;
-
-    /* copy tail */
-    b = &p->p_cmdlin[0];
-    for (i = 0; (i < PDCLSIZE) && (*tail); i++)
-        *b++ = *tail++;
-
-    *b++ = 0;
-}
-
-/* duplicate files */
+/* duplicate file handles */
 static void init_pd_files(PD *p)
 {
     int i;
 
-    /* inherit standard files from me */
+    /* inherit standard files from the current running process */
     for (i = 0; i < NUMSTD; i++) {
         WORD h = run->p_uft[i];
         if (h > 0)
@@ -409,29 +367,94 @@ static void init_pd_files(PD *p)
     p->p_curdrv = run->p_curdrv;
 }
 
-/* allocate the environment, in ST RAM or alternate RAM, according to the header flags */
-static char *alloc_env(ULONG flags, char *env)
+static void deinit_pd_files(PD *r)
 {
-    char *new_env;
-    int size;
+    WORD h;
+    WORD i;
 
-    /* determine the env size */
-    if (env == NULL)
-        env = run->p_env;
-    size = (envsize(env) + 1) & ~1;  /* must be even */
+    /* check the standard devices in both file tables  */
 
-    /* allocate it */
-    new_env = xmxalloc(size, (flags&PF_TTRAMLOAD) ? MX_PREFTTRAM : MX_STRAM);
-    if (new_env)
+    for (i = 0; i < NUMSTD; i++)
+        if ((h = r->p_uft[i]) > 0)
+            xclose(h);
+
+    for (i = 0; i < OPNFILES; i++)
+        if (r == sft[i].f_own)
+            xclose(i+NUMSTD);
+
+    /* decrement usage counts for current directories */
+
+    for (i = 0; i < NUMCURDIR; i++)
     {
-        memcpy(new_env, env, size);     /* copy it */
+        if ((h = r->p_curdir[i]) != 0)
+            decr_curdir_usage(h);
     }
-
-    return new_env;
 }
 
 /*
- * allocate the TPA
+ * Allocate the environment and PD, in ST RAM or alternate RAM, according to the header flags
+ */
+static PD *alloc_pd_tpa_and_setup_env(LOAD_STATE *lstate, const char *tail, const char *env)
+{
+    PD *pd;
+    int env_size;
+    char *new_env;
+    LONG allocated_size;
+
+    /* determine the env size */
+    if (env == NULL)
+        env = run->p_env; /* inherit environment of current process */
+    env_size = (envsize(env) + 1) & ~1;  /* must be even */
+
+    /* allocate space for the copy of the environment */
+    new_env = xmxalloc(env_size, lstate->flags & PF_TTRAMLOAD ? MX_PREFTTRAM : MX_STRAM);
+    if (!new_env)
+    {
+        KDEBUG(("BDOS xexec: not enough memory for environment\n"));
+        return NULL;
+    }
+    
+    /* allocate space for the PD (BASEPAGE) plus relocatable segments size */
+    pd = (PD *)alloc_tpa(lstate->flags, sizeof(PD) + lstate->relocatable_size, &allocated_size
+#if CONF_WITH_NON_RELOCATABLE_SUPPORT
+        , 0L
+#endif
+    );
+    if (!pd)
+    {
+        KDEBUG(("BDOS xexec: not enough memory for basepage\n"));
+        xmfree(new_env);
+    }
+    else
+    {
+        char *b;
+        int i;
+
+        /* init basepage memory */
+        set_owner(pd, lstate->owner ? lstate->owner : pd);
+        bzero(pd, sizeof(PD));
+
+        /* setup the environment (before we alter 'size') */
+        set_owner(new_env, lstate->owner);
+        memcpy(new_env, env, env_size);
+
+        /* memory values */
+        pd->p_lowtpa = (UBYTE*)pd;
+        pd->p_hitpa  = (UBYTE*)pd + allocated_size; /* first byte after our allocated memory */
+        pd->p_xdta   = (DTA*)pd->p_cmdlin;       /* TOS "quirk": default p_xdta (process DTA) is p_cmdlin */
+        pd->p_env    = new_env;
+
+        /* copy the command arguments */
+        for (i = 0, b = &pd->p_cmdlin[0]; i < PDCLSIZE && *tail != '\0'; i++)
+            *b++ = *tail++;
+        *b++ = 0;
+    }
+
+    return pd;
+}
+
+/*
+ * allocate memory in the Transcient Program Area (TPA)
  *
  * we first determine if ST RAM and/or alternate RAM is available for
  * allocation, based on the flags, the amount of RAM required and
@@ -455,25 +478,39 @@ static char *alloc_env(ULONG flags, char *env)
  * pages 29-30.
  *
  * returns: ptr to allocated memory (NULL => failed)
- *          updates 'avail' with the size of allocated memory
+ *          updates 'allocated_size' with the size of allocated memory
  */
-static UBYTE *alloc_tpa(ULONG flags,LONG needed,LONG *avail)
+UBYTE *alloc_tpa(ULONG flags, LONG needed, LONG *allocated_size
+#if CONF_WITH_NON_RELOCATABLE_SUPPORT
+    , UBYTE *start_address
+#endif
+)
 {
     MD *md;
-    LONG st_ram_size;
+    ULONG st_ram_size;
     BOOL st_ram_available = FALSE;
 
+
+#if CONF_WITH_NON_RELOCATABLE_SUPPORT
+    st_ram_size = (LONG) find_first_large_enough_free_block(-1L, &pmd, start_address);
+#else
+    /* pmd is the ST-RAM descriptor */
     st_ram_size = (LONG) ffit(-1L, &pmd);
+#endif
     if (st_ram_size >= needed)
         st_ram_available = TRUE;
 
 #if CONF_WITH_ALT_RAM
     {
-        LONG alt_ram_size = 0L, tpasize;
+        ULONG alt_ram_size = 0L, tpasize;
         BOOL alt_ram_available = FALSE;
 
         if (has_alt_ram && (flags & PF_TTRAMLOAD)) {
-            alt_ram_size = (LONG) ffit(-1L, &pmdalt);
+#if CONF_WITH_NON_RELOCATABLE_SUPPORT
+            alt_ram_size = (LONG) find_first_large_enough_free_block(-1L, &pmdalt, start_address);
+#else
+            alt_ram_size = (ULONG) ffit(-1L, &pmdalt);
+#endif
             if (alt_ram_size >= needed)
                 alt_ram_available = TRUE;
         }
@@ -485,16 +522,25 @@ static UBYTE *alloc_tpa(ULONG flags,LONG needed,LONG *avail)
         }
 
         if (alt_ram_available) {
-            *avail = alt_ram_size;
+            *allocated_size = alt_ram_size;
+#if CONF_WITH_NON_RELOCATABLE_SUPPORT
+            md = find_first_large_enough_free_block(alt_ram_size, &pmdalt, start_address);
+#else
             md = ffit(alt_ram_size, &pmdalt);
+#endif
             return md->m_start;
         }
     }
-#endif
+#endif /* CONF_WITH_ALT_RAM */
 
     if (st_ram_available) {
-        *avail = st_ram_size;
+        *allocated_size = st_ram_size;
+        /* take the largest free block */
+#if CONF_WITH_NON_RELOCATABLE_SUPPORT
+        md = find_first_large_enough_free_block(st_ram_size, &pmd, start_address);
+#else
         md = ffit(st_ram_size, &pmd);
+#endif
         return md->m_start;
     }
 
@@ -537,7 +583,8 @@ static void proc_go(PD *p)
 {
     struct gouser_stack *sp;
 
-    KDEBUG(("BDOS xexec: trying to load (and execute) a process on %p ...\n",p->p_tbase));
+    KDEBUG(("BDOS xexec: trying to load (and execute) a process on %p ...\n", p->p_tbase));
+
     p->p_parent = run;
 
     /* create a stack at the end of the TPA */

@@ -180,7 +180,6 @@ Vwk * get_vwk_by_handle(WORD handle)
 }
 
 
-
 /*
  * update resolution-dependent VDI/lineA variables
  *

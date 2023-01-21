@@ -59,6 +59,12 @@ REGION_ALIAS("REGION_RAM", altram)
 REGION_ALIAS("REGION_RAM", stram)
 #endif
 
+/* Programs embedded in ROM */
+TARGET(binary)
+INPUT ("tools/rom.prg")
+TARGET(binary)
+
+
 /* Regions used by EmuTOS sections */
 #if EMUTOS_LIVES_IN_RAM
 REGION_ALIAS("REGION_READ_ONLY", REGION_RAM)
@@ -135,6 +141,12 @@ SECTIONS
         __data = .;
         *(.data)
         __edata = .;
+    } >REGION_READ_ONLY
+
+    /* This contains program embedded in the ROM. */
+    .embedded_progs : SUBALIGN(2)
+    {
+        "tools/rom.prg"
     } >REGION_READ_ONLY
 
     /* The BSS segment contains uninitialized global variables.
