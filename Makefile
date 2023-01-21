@@ -1072,7 +1072,7 @@ mkrom: tools/mkrom.c
 # test target to build all tools that can be built by the Makefile
 .PHONY: tools
 NODEP += tools
-tools: bug draft erd grd ird localise mkflop mkrom mrd boot-delay tos-lang-change
+tools: bug draft erd grd ird localise mkflop mkrom mrd tos-lang-change boot-delay
 
 # user tools, not needed in EmuTOS building
 TOCLEAN += tos-lang-change boot-delay
