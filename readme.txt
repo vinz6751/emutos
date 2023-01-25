@@ -5,6 +5,23 @@ This fork aims at packing as much as possible into 256K ROM, compatibility to ga
 Full credits to the EmuTOS team for making great EmuTOS and for allowing such customizations.
 See readme-mps.txt for more details on differences between EmuTOS and this fork.
 
+This for has the following improvements:
+1. The ACCPATH environment variable allows to specify the folder from which GEM accessories will be loaded (it doesn't have to be the boot drive's root anymore).
+2. You can compile the OS with MPS_BLITTER_ALWAYS_ON=1 so it always uses the blitter for drawing. The "no-blitter" drawing routines will not be included and it saves ROM space for other features.
+3. A small sound is played at cold boot and warm boot, they're are a bit different.
+4. The BIOS injects "the_env" OS variable to programs it executes, including the AES. So you if you sent that variable to something you want, it will actually have an effect. This was used so we can set the PATH environment variable of EmuCON, or ACCPATH of the AES.
+
+
+Refactorings
+1. The AES configuration file is moved to a separate file (aescfg.c).
+2. Supporting functions shared between the graphics shell and EmuCON are in shellutl.c
+3. The logo displayed at startup is compressed using tools/logo_compressor.c. The compression is basic but it helps a bit.
+4. The startup of the BDOS is now in bootstrap.c so it's better separated. Code is moved from bios/initinfo.c is renamed into bdos/initinfo.c because at the time it runs, the BDOS is effectively running and BDOS functions are used for the boot screen. In that file, there are now helper functions like crlf() so to avoid code repetition and save ROM space.
+5. iumem is reworked (CONF_WITH_NON_RELOCATABLE_SUPPORT) so to support non-relocatable programs (ie programs that want to be located at a particular location in RAM). This was done because I wanted to use the Calypsi compiler, but it could not produce TOS executables, only PGX/PGZ which are not relocatable. But this is probably not needed anymore as version 3.7 can produce TOS executables.
+6. kpgmld.c/proc.h are reorganized and broken up so it only orchestrates the loading of files to execute. kpgmld.c use program loaders and adapts to proc.c The reading of files (from disk or ROM) is done by a program_reader.c and the identification/relocation etc. done by a program_loader. This was also done for sake of being able to use Calypsi and is probably not needed anymore functionnaly, but it's good to have more separated unit of codes having different responsibilities so the design can stay.
+7. BIOS's tries to have a bit more single reponsibility in managing memory. For example, xmaddalt is replaced with bmem_register.
+
+
 ----
 The below is the original EmuTOS readme:
 
