@@ -58,6 +58,7 @@
 
 #include "string.h"
 #include "tosvars.h"
+#include "shellutl.h"
 
 /* Prototypes: */
 void accdesk_start(void) NORETURN;  /* called only from gemstart.S */
@@ -107,6 +108,7 @@ typedef struct {                     /* used by count_accs()/ldaccs() */
 } ACC;
 
 static ACC      acc[NUM_ACCS];
+static char    *accpath;                /* used to read the ACCPATH env var, empty string if var is not present */
 static char     infbuf[INF_SIZE+1];     /* used to read part of EMUDESK.INF */
 
 #if CONF_WITH_BACKGROUNDS
@@ -139,7 +141,6 @@ GLOBAL SPB      wind_spb;
 GLOBAL WORD     curpid;
 
 GLOBAL THEGLO   D;
-
 
 
 /*
@@ -242,7 +243,7 @@ static void load_one_acc(ACC *acc)
     KDEBUG(("load_one_acc(\"%s\")\n", (const char *)acc->name));
 
     acc->addr = -1L;
-    strcpy(D.s_cmd, acc->name);
+    sprintf(D.s_cmd, "%s\\%s", accpath , acc->name);
 
     ret = dos_open(D.s_cmd, ROPEN);
     if (ret >= 0L)
@@ -269,7 +270,11 @@ static WORD count_accs(void)
     if (bootflags & BOOTFLAG_SKIP_AUTO_ACC)
         return 0;
 
-    strcpy(D.g_work,"\\*.ACC");
+    shellutl_getenv(ad_envrn, "ACCPATH=", &accpath);
+    if (accpath == NULL)
+	accpath = "";
+    sprintf(D.g_work,"%s\\*.ACC", accpath);
+
     dos_sdta(&D.g_dta);
 
     for (i = 0; i < NUM_ACCS; i++)
@@ -278,6 +283,7 @@ static WORD count_accs(void)
         if (rc < 0)
             break;
         strlcpy(acc[i].name,D.g_dta.d_fname,LEN_ZFNAME);
+	Cconws(acc[i].name);Cconws("\r\n");
     }
 
     return i;
