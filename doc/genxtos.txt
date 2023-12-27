@@ -1,0 +1,35 @@
+This are notes about the work that has been done to make EmuTOS work on the Foenix
+
+1. Display
+The OS works with graphics and text enabled (with overlay), so the color 0 of the text is transparent and the bitmap is rendered behind it. This is so we can have VICKY's high performance text mode and be able to draw things at the same time.
+VICKY II currently only supports 8x8.
+However we can alternatively support 8x16 by rendering everything to a shadow framebuffer in RAM and copy that framebuffer to the VRAM during VBL. Without DMA, this is slow so we have a mecanism where we can render only a particular text cell of the screen. We have a ringbuffer a2560u_bios_dirty_cells where we can store the list of cells that have to be repainted. If there are too many, it's possible to order a full copy of the shadow framebuffer. Obviously, without DMA this is slow, and the bigger the resolution, the slower.
+
+
+
+BIOS #$c Bgettpa added so the GEMDOS doesn't have to read direct memory addresses (be them documented systmem variables).
+
+
+TPA_AREA *bmem_gettpa(void);
+
+
+
+BIOS $d Balloc to allocate memory before membot, or below memtop. membot/memtop are is bumped/decreased accordingly. This is used by GEMDOS (bufl_init) to reserve space for its buffers, so the TPA is completely unused.
+
+UBYTE *Balloc(ULONG size, BOOL from_top)
+
+(BOOL = int)
+
+
+BIOS $e Bdrvrem returns a LONG where each bit correspond to a drive, if the bit is 1, it means the drive support media change.
+
+TODO: remplacer Bdrvrem Bgettpa etc par une Bgetvar(short) qui retourne un 
+typedef union 
+{
+	TPA_AREA *tpa_area;
+	LONG drvrem;
+	void (*panic)(const char *fmt...);
+	...
+} BIOSVAR;
+
+make bdos et voir les variables TOS encore utilis�es, remplacer �a

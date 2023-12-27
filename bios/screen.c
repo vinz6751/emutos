@@ -13,7 +13,7 @@
  * option any later version.  See doc/license.txt for details.
  */
 
-/*#define ENABLE_KDEBUG*/
+/* #define ENABLE_KDEBUG */
 
 #include "emutos.h"
 #include "machine.h"
@@ -22,6 +22,7 @@
 #include "videl.h"
 #include "asm.h"
 #include "tosvars.h"
+#include "linea.h" // linea_set_screen_shift
 #include "lineavars.h"
 #include "nvram.h"
 #include "font.h"
@@ -37,6 +38,7 @@
 #include "amiga.h"
 #include "lisa.h"
 #include "nova.h"
+#include "a2560u_bios.h"
 
 void detect_monitor_change(void);
 static void setphys(const UBYTE *addr);
@@ -51,10 +53,10 @@ void *video_ram_addr;
 /* Define palette */
 
 static const UWORD dflt_palette[] = {
-    RGB_BLACK, RGB_RED, RGB_WHITE, RGB_YELLOW,
+    RGB_WHITE, RGB_RED, RGB_GREEN, RGB_YELLOW,
     RGB_BLUE, RGB_MAGENTA, RGB_CYAN, RGB_LTGRAY,
     RGB_GRAY, RGB_LTRED, RGB_LTGREEN, RGB_LTYELLOW,
-    RGB_LTBLUE, RGB_LTMAGENTA, RGB_LTCYAN, RGB_GREEN
+    RGB_LTBLUE, RGB_LTMAGENTA, RGB_LTCYAN, RGB_BLACK
 };
 
 /*
@@ -195,9 +197,9 @@ WORD esetshift(WORD mode)
 
     /*
      * because the resolution may have changed, we must reinitialise
-     * the VT52 emulator
+     * the screen services (Line-A, VT52 emulator)
      */
-    vt52_init();
+    screen_init_services();
 
     return oldmode;
 }
@@ -628,6 +630,10 @@ void screen_init_mode(void)
     lisa_screen_init();
 #endif
 
+#ifdef MACHINE_A2560U
+    a2560u_bios_screen_init();
+#endif
+
     rez_was_hacked = FALSE; /* initial assumption */
 }
 
@@ -636,6 +642,7 @@ void screen_init_address(void)
 {
     LONG vram_size;
     UBYTE *screen_start;
+    MAYBE_UNUSED(vram_size);
 
 #if CONF_VRAM_ADDRESS
     vram_size = 0L;         /* unspecified */
@@ -654,8 +661,14 @@ void screen_init_address(void)
     /* set new v_bas_ad */
     v_bas_ad = screen_start;
     KDEBUG(("v_bas_ad = %p, vram_size = %lu\n", v_bas_ad, vram_size));
+
+#ifdef MACHINE_A2560U
+    /* We use a shadow framebuffer, and have code in place to copy it to the VRAM */
+    setphys((const UBYTE *)VRAM_Bank0);
+#else
     /* correct physical address */
     setphys(screen_start);
+#endif
 }
 
 /*
@@ -664,12 +677,11 @@ void screen_init_address(void)
  * called by bios_init() if a special video mode (Nova support, Hatari
  * cartridge extended VDI) has altered key lineA variables
  */
-void set_rez_hacked(void)
+void screen_set_rez_hacked(void)
 {
     rez_was_hacked = TRUE;
 
-    set_screen_shift();     /* set shift amount for screen address calc */
-    vt52_init();            /* initialize the vt52 console */
+    screen_init_services();
 }
 
 /*
@@ -708,6 +720,8 @@ WORD get_monitor_type(void)
 
 #if CONF_WITH_ATARI_VIDEO
     return shifter_get_monitor_type();
+#elif defined(MACHINE_A2560U)
+    return a2560u_bios_vmontype();
 #else
     return MON_MONO;    /* fake monochrome monitor */
 #endif
@@ -720,7 +734,7 @@ struct video_mode {
     UWORD       vt_rez;         /* screen vertical resolution (v_vt_rez) */
 };
 
-static const struct video_mode vmode_table[] = {
+static const struct video_mode const vmode_table[] = {
     { 4,  320, 200},            /* rez=0: ST low */
     { 2,  640, 200},            /* rez=1: ST medium */
     { 1,  640, 400},            /* rez=2: ST high */
@@ -746,6 +760,8 @@ ULONG calc_vram_size(void)
     return amiga_initial_vram_size();
 #elif defined(MACHINE_LISA)
     return 32*1024UL;
+#elif defined(MACHINE_A2560U)
+    return a2560u_bios_calc_vram_size();
 #else
     ULONG vram_size;
 
@@ -804,6 +820,8 @@ void screen_get_current_mode_info(UWORD *planes, UWORD *hz_rez, UWORD *vt_rez)
     *planes = 1;
     *hz_rez = 720;
     *vt_rez = 364;
+#elif defined(MACHINE_A2560U)
+    a2560u_bios_get_current_mode_info(planes, hz_rez, vt_rez);
 #else
     atari_get_current_mode_info(planes, hz_rez, vt_rez);
 #endif
@@ -818,6 +836,12 @@ WORD get_palette(void)
 {
 #ifdef MACHINE_AMIGA
     return 2;               /* we currently only support monochrome */
+#endif
+#ifdef MACHINE_A2560U
+    /* All modes are 256 coloursVICKY can do 24bit but this function only returns 16 bits and
+     * the VDI, EmuDesk etc. don't support more than 256 colors.
+     * So we limit ourselves to 256 as it's done in videl.c */
+    return 256;
 #else
     WORD palette;
 
@@ -831,7 +855,7 @@ WORD get_palette(void)
             return 4096;
         return 0;
     }
-#endif
+#endif /* CONF_WITH_VIDEL */
 
     palette = 4096;         /* for STe/TT colour modes */
 
@@ -880,7 +904,7 @@ static __inline__ void get_std_pixel_size(WORD *width,WORD *height)
  */
 void get_pixel_size(WORD *width,WORD *height)
 {
-#ifdef MACHINE_AMIGA
+#if defined(MACHINE_AMIGA) || defined(MACHINE_A2560U)
     get_std_pixel_size(width,height);
 #else
     if (HAS_VIDEL || HAS_TT_SHIFTER)
@@ -1031,6 +1055,8 @@ const UBYTE *physbase(void)
     return amiga_physbase();
 #elif defined(MACHINE_LISA)
     return lisa_physbase();
+#elif defined(MACHINE_A2560U)
+    return a2560u_bios_physbase();
 #elif CONF_WITH_ATARI_VIDEO
     return atari_physbase();
 #else
@@ -1049,6 +1075,8 @@ static void setphys(const UBYTE *addr)
     amiga_setphys(addr);
 #elif defined(MACHINE_LISA)
     lisa_setphys(addr);
+#elif defined(MACHINE_A2560U)
+    a2560u_setphys(addr);
 #elif CONF_WITH_ATARI_VIDEO
     atari_setphys(addr);
 #endif
@@ -1136,16 +1164,24 @@ WORD setscreen(UBYTE *logLoc, const UBYTE *physLoc, WORD rez, WORD videlmode)
 
 #ifdef MACHINE_AMIGA
     amiga_setrez(rez, videlmode);
+#elif defined(MACHINE_A2560U)
+    a2560u_bios_setrez(rez, videlmode);
 #elif CONF_WITH_ATARI_VIDEO
     atari_setrez(rez, videlmode);
 #endif
 
+    screen_init_services();
+
+    return oldmode;
+}
+
+void screen_init_services(void)
+{
+    KDEBUG(("screen_init_services\n"));
     /* Re-initialize line-a, VT52 etc: */
     linea_init();
     if (v_planes < 16)
         vt52_init();
-
-    return oldmode;
 }
 
 void setpalette(const UWORD *palettePtr)

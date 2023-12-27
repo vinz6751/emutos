@@ -29,11 +29,16 @@
 #define DSKBUF_SIZE     (DSKBUF_SECS * SECTOR_SIZE)
 
 /* Forward declarations */
-struct _mcs;
 struct font_head;
 
 /* Bitmap of removable logical drives */
 extern LONG drvrem;
+
+/* Boot flags */
+extern UBYTE bootflags;
+#define BOOTFLAG_EARLY_CLI     0x01
+#define BOOTFLAG_SKIP_HDD_BOOT 0x02
+#define BOOTFLAG_SKIP_AUTO_ACC 0x04
 
 ULONG kbd_default_datetime(void);
 
@@ -87,9 +92,6 @@ void flop_eject(void);
 extern void (*mousexvec)(WORD scancode);    /* Additional mouse buttons */
 #endif
 
-/* Line A extensions */
-extern UBYTE v_planes_shift; /* pixel to address helper */
-
 /* determine monitor type, ... */
 WORD get_monitor_type(void);
 WORD get_palette(void);
@@ -97,9 +99,6 @@ void get_pixel_size(WORD *width,WORD *height);
 int rez_changeable(void);
 WORD check_moderez(WORD moderez);
 void initialise_palette_registers(WORD rez,WORD mode);
-
-/* return machine type name (machine.c) */
-const char *machine_name(void);
 
 #if CONF_WITH_APOLLO_68080
 /* The CPU cookie reports a 68040 because that's what the 68080 is the closest too, and

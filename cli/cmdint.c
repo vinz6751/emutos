@@ -134,6 +134,33 @@ LOCAL const char * const help_edit[] = {
  N_("left/right arrow = previous/next character"),
  N_("control-left/right arrow = previous/next word"), NULL };
 
+// TODO CLEAN ME
+LONG run_showmouse(WORD argc, char **argv); // in cmdtest.S
+LONG run_hidemouse(WORD argc, char **argv); // in cmdtest.S
+#if 0
+#include "lineavars.h"
+#include <stdio.h>
+
+static LONG run_testmouse(WORD argc, char **argv) 
+{
+    WORD oldx = GCURX;
+    WORD oldy = GCURY;
+    WORD oldbuts = MOUSE_BT;
+    outputnl("Testing the mouse, any key to exit...");
+    while (!Bconstat(2))
+    {
+        if (oldx != GCURX || oldy != GCURY || oldbuts != MOUSE_BT)
+        {
+            char buf[40];
+            sprintf(buf, "X:%04d Y:%04d B:%02x  Stat:%04x\r\n", GCURX, GCURY, MOUSE_BT,cur_ms_stat);
+            outputnl(buf);
+            oldx = GCURX;
+            oldy = GCURY;
+            oldbuts = MOUSE_BT;            
+        }
+    }
+}
+#endif
 
 /*
  *  command table
@@ -160,8 +187,14 @@ LOCAL const COMMAND cmdtable[] = {
     { "show", NULL, 0, 1, run_show, help_show },
     { "version", NULL, 0, 0, run_version, help_version },
     { "wrap", NULL, 0, 1, run_wrap, help_wrap },
+    { "showmouse", NULL, 0, 0, run_showmouse, NULL},
+    { "hidemouse", NULL, 0, 0, run_hidemouse, NULL},
+#if 0
+    { "testmouse", NULL, 0, 0, run_testmouse, NULL},    
+#endif
     { "", NULL, 0, 255, NULL, NULL }                    /* end marker */
 };
+
 
 static LONG linecount;  /* used by 'more' command */
 
@@ -483,6 +516,7 @@ const char *p;
             p = _("(empty)");
         message(" ");
         messagenl(p);
+
     } else {
         strcpy(user_path,argv[1]);
     }
@@ -564,7 +598,8 @@ PRIVATE LONG run_setdrv(WORD argc,char **argv)
     if (!is_valid_drive(argv[0][0]))
         return EDRIVE;
 
-    Dsetdrv(shellutl_get_drive_number(argv[0][0]));
+    strlower(argv[0]);
+    Dsetdrv(argv[0][0]-'a');
 
     return 0L;
 }
@@ -578,8 +613,10 @@ char id[] = "X:";
 
     if (argc == 1)
         drive = Dgetdrv();
-    else
-        drive = shellutl_get_drive_number(argv[1][0]);
+    else {
+        strlower(argv[1]);
+        drive = argv[1][0] - 'a';
+    }
 
     rc = Dfree(info,drive+1);
 
@@ -1035,8 +1072,10 @@ WORD drive;
         strcpy(filespec,"*.*");
     for (p = filespec; *p; p++)
         ;
+
     if (*(p-1) == DRIVESEP) {        /* add current path for drive */
         drive = shellutl_get_drive_number(*(p-2));
+
         Dgetpath(p,drive+1);
         for ( ; *p; p++)
             ;
@@ -1105,12 +1144,11 @@ PRIVATE LONG is_valid_drive(char drive_letter)
 ULONG drvbits;
 WORD drive_number;
 
-    drive_number = shellutl_get_drive_number(drive_letter);
-
+    drvbits = Dsetdrv(Dgetdrv());
+    drive_number = (drive_letter | 0x20) - 'a';
     if ((drive_number < 0) || (drive_number >= BLKDEVNUM))
         return 0;
 
-    drvbits = Dsetdrv(Dgetdrv());
     return (drvbits & (1L << drive_number)) ? 1 : 0;
 }
 
@@ -1126,6 +1164,7 @@ PRIVATE LONG check_path_component(char *component)
 char *p;
 WORD fixup;
 LONG rc;
+
     /*
      * if drive specified, validate it and check
      * for "X:" and "X:\" directory specifications

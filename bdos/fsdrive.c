@@ -38,7 +38,7 @@
 #include "biosbind.h"
 #include "bdosstub.h"
 #include "biosext.h"
-
+#include "tosvars.h"
 
 /*
  **     globals
@@ -96,14 +96,14 @@ WORD ckdrv(int d, BOOL checkrem)
         b = (BPB *) Getbpb(d);
 
         if (!b)
-            return (mask&drvrem) ? EPTHNF : EDRIVE;
+            return (mask&Bdrvrem()) ? EPTHNF : EDRIVE;
 
         if (log_media(b,d))
             return ENSMEM;
 
         drvsel |= mask;
     }
-    else if (checkrem && (mask & drvrem))   /* handle removable media */
+    else if (checkrem && (mask & Bdrvrem()))   /* handle removable media */
     {
         if (Mediach(d))
         {

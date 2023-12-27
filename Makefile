@@ -64,6 +64,8 @@ help:
 	@echo "m548x-dbug $(SREC_M548X_DBUG), EmuTOS-RAM for dBUG on ColdFire Evaluation Boards"
 	@echo "m548x-bas  $(SREC_M548X_BAS), EmuTOS for BaS_gcc on ColdFire Evaluation Boards"
 	@echo "m548x-prg  emutos.prg, a RAM tos for ColdFire Evaluation Boards with BaS_gcc"
+	@echo "c256genx   $(ROM_C256GENX), EmuTOS flash image for the C256 GenX with 68000 CPU Module"
+	@echo "a2560u    $(ROM_A2560U), EmuTOS flash image for the A2560U Foenix"	
 	@echo "prg     emutos.prg, a RAM tos"
 	@echo "prg256  $(EMU256_PRG), a RAM tos for ST/STe systems"
 	@echo "flop    $(EMUTOS_ST), a bootable floppy with RAM tos"
@@ -234,6 +236,10 @@ MULTILIBFLAGS = $(CPUFLAGS) -mshort
 INC = -Iinclude
 OTHERFLAGS = -fomit-frame-pointer -fno-common
 
+# VASM for .asm files
+ASM = vasmm68k_mot
+ASMFLAGS = -quiet -Faout -x $(CPUFLAGS) -spaces -showopt
+
 # Optimization flags (affects ROM size and execution speed)
 STANDARD_OPTFLAGS = -O2
 SMALL_OPTFLAGS = -Os
@@ -285,6 +291,16 @@ OBJCOPY = $(TOOLCHAIN_PREFIX)objcopy
 # the native C compiler, for tools
 NATIVECC = gcc -ansi -pedantic $(WARNFLAGS) -Wextra $(BUILD_TOOLS_OPTFLAGS)
 
+foenix_src = a2560u_s.S a2560u.c \
+	ps2_mouse_a2560u.c ps2.c ps2_keyboard.c \
+	uart16550.c sn76489.c ym262.c wm8776.c bq4802ly.c vicky2.c vicky_mouse.c \
+	shadow_fb.c shadow_fb_s.S
+
+foenix_src = a2560u_s.S a2560u.c \
+	ps2_mouse_a2560u.c ps2.c ps2_keyboard.c \
+	uart16550.c sn76489.c ym262.c wm8776.c bq4802ly.c vicky2.c vicky_mouse.c \
+	shadow_fb.c shadow_fb_s.S
+
 #
 # source code in bios/
 #
@@ -297,9 +313,11 @@ bios_src += lowstram.c
 
 # Other BIOS sources can be put in any order
 bios_src +=  memory.S processor.S vectors.S aciavecs.S bios.c xbios.c acsi.c \
-             biosmem.c blkdev.c chardev.c clock.c conout.c country.c \
-             disk.c dma.c dmasound.c floppy.c font.c ide.c ikbd.c \
-             kprint.c kprintasm.S linea.S lineainit.c lineavars.S machine.c \
+             biosmem.c blkdev.c chardev.c clock.c \
+             conout.c conout_atarifb.c \
+             country.c \
+             disk.c dma.c dmasound.c floppy.c font.c ide.c ikbd.c initinfo.c \
+             kprint.c kprintasm.S machine.c \
              mfp.c midi.c mouse.c natfeat.S natfeats.c nvram.c panicasm.S \
              parport.c screen.c serport.c sound.c videl.c vt52.c xhdi.c \
              pmmu030.c 68040_pmmu.S \
@@ -307,6 +325,7 @@ bios_src +=  memory.S processor.S vectors.S aciavecs.S bios.c xbios.c acsi.c \
              lisa.c lisa2.S \
              delay.c delayasm.S sd.c memory2.c bootparams.c scsi.c nova.c \
              dsp.c dsp2.S \
+             a2560u_bios.c a2560u_bios_s.S a2560u_conout_text.c a2560u_conout_bmp.c \
              scsidriv.c
 
 ifeq (1,$(COLDFIRE))
@@ -319,7 +338,7 @@ endif
 
 bdos_src = bdosmain.c console.c fsbuf.c fsdir.c fsdrive.c fsfat.c fsglob.c \
            fshand.c fsio.c fsmain.c fsopnclo.c iumem.c kpgmld.c osmem.c \
-           proc.c rwa.S time.c umem.c initinfo.c bootstrap.c logo.c \
+           proc.c rwa.S time.c umem.c bootstrap.c logo.c \
 		   program_loader.c prg_program_loader.c pgz_program_loader.c
 
 #
@@ -341,7 +360,12 @@ endif
 vdi_src = vdi_asm.S vdi_bezier.c vdi_col.c vdi_control.c vdi_esc.c \
           vdi_fill.c vdi_gdp.c vdi_input.c vdi_line.c vdi_main.c \
           vdi_marker.c vdi_misc.c vdi_mouse.c vdi_raster.c vdi_text.c \
-          vdi_textblit.c
+          vdi_textblit.c vdi_locator.c \
+		  mform.c \
+		  linea_.S linea.c lineavars.S \
+		  linea_mouse.c linea_mouse_.S \
+		  linea_mouse_atari.c linea_mouse_a2560u.c \
+		  linea_sprite_atari.c
 
 ifeq (1,$(COLDFIRE))
 vdi_src += vdi_tblit_cf.S
@@ -376,7 +400,7 @@ desk_src = deskstart.S deskmain.c gembind.c deskact.c deskapp.c deskdir.c \
 # source code in cli/ for EmuTOS console EmuCON
 #
 
-cli_src = cmdasm.S cmdmain.c cmdedit.c cmdexec.c cmdint.c cmdparse.c cmdutil.c
+cli_src = cmdasm.S cmdmain.c cmdedit.c cmdexec.c cmdint.c cmdparse.c cmdutil.c cmdtest.S
 
 #
 # source code to put at the end of the ROM
@@ -442,7 +466,7 @@ REF_OS=
 #
 
 # Core directories are essential for basic OS operation
-core_dirs = bios bdos util
+core_dirs = bios bdos util foenix
 
 # Optional directories may be disabled for reduced features
 optional_dirs = vdi
@@ -472,6 +496,7 @@ include country.mk
 
 SRC = $(foreach d,$(dirs),$(addprefix $(d)/,$($(d)_src))) $(end_src)
 
+#CORE_OBJ = $(foreach d,$(core_dirs),$(patsubst %.asm,obj/%.o,$(patsubst %.c,obj/%.o,$(patsubst %.S,obj/%.o,$($(d)_src))))) $(FONTOBJ_COMMON) obj/libfont.a obj/version.o
 CORE_OBJ = $(foreach d,$(core_dirs),$(patsubst %.c,obj/%.o,$(patsubst %.S,obj/%.o,$($(d)_src)))) $(FONTOBJ_COMMON) obj/libfont.a obj/version.o
 OPTIONAL_OBJ = $(foreach d,$(optional_dirs),$(patsubst %.c,obj/%.o,$(patsubst %.S,obj/%.o,$($(d)_src))))
 END_OBJ = $(patsubst %,obj/%.o,$(basename $(notdir $(end_src))))
@@ -483,7 +508,11 @@ OBJECTS = $(CORE_OBJ) $(OPTIONAL_OBJ) $(END_OBJ)
 
 TOCLEAN += obj/*.ld
 
+
 obj/emutospp.ld: emutos.ld include/config.h tosvars.ld
+	$(CPP) $(CPPFLAGS) -P -x c $< -o $@
+
+%.ld:%.ld_
 	$(CPP) $(CPPFLAGS) -P -x c $< -o $@
 
 #
@@ -766,6 +795,56 @@ m548x-bas:
 	@printf "$(LOCALCONFINFO)"
 
 #
+# C256 Foenix GenX with 68000 CPU module image
+#
+
+TOCLEAN += *.rom
+
+ROM_MACHINE_C256GENX = emutos-c256genx.rom
+C256GENX_DEFS =
+
+.PHONY: c256genx
+NODEP += c256genx
+c256genx: UNIQUE = $(COUNTRY)
+c256genx: OPTFLAGS = $(SMALL_OPTFLAGS)
+c256genx: override DEF += -DTARGET_C256GENX_ROM -DMACHINE_C256FOENIXGENX $(C256GENX_DEFS)
+c256genx: WITH_AES = 0
+c256genx:
+	@echo "# Building C256 Foenix GenX EmuTOS into $(ROM_MACHINE_C256GENX)"
+	$(MAKE) CPUFLAGS='$(CPUFLAGS)' DEF='$(DEF)' OPTFLAGS='$(OPTFLAGS)' UNIQUE=$(UNIQUE) ROM_MACHINE_C256GENX=$(ROM_MACHINE_C256GENX) $(ROM_MACHINE_C256GENX)
+	@MEMBOT=$(call SHELL_SYMADDR,__end_os_stram,emutos.map);\
+	echo "# RAM used: $$(($$MEMBOT))"
+	@printf "$(LOCALCONFINFO)"
+
+$(ROM_MACHINE_C256GENX): emutos.img mkrom
+	./mkrom pad 4M $< $(ROM_MACHINE_C256GENX)
+
+
+#
+# A2560U Foenix
+#
+
+TOCLEAN += *.rom
+
+ROM_MACHINE_A2560U = emutos-a2560u.rom
+A2560U_DEFS =
+
+.PHONY: a2560u
+NODEP += a2560u
+a2560u: UNIQUE = $(COUNTRY)
+a2560u: OPTFLAGS = $(SMALL_OPTFLAGS)
+a2560u: override DEF += -DTARGET_A2560U_ROM -DMACHINE_A2560U $(A2560U_DEFS)
+a2560u:
+	@echo "# Building A2560U Foenix EmuTOS into $(ROM_MACHINE_A2560U)"
+	$(MAKE) CPUFLAGS='$(CPUFLAGS)' DEF='$(DEF)' OPTFLAGS='$(OPTFLAGS)' UNIQUE=$(UNIQUE) ROM_MACHINE_A2560U=$(ROM_MACHINE_A2560U) $(ROM_MACHINE_A2560U)
+	@MEMBOT=$(call SHELL_SYMADDR,__end_os_stram,emutos.map);\
+	echo "# RAM used: $$(($$MEMBOT))"
+	@printf "$(LOCALCONFINFO)"
+
+$(ROM_MACHINE_A2560U): emutos.img mkrom
+	./mkrom pad 512k $< $(ROM_MACHINE_A2560U)
+
+#
 # Special variants of EmuTOS running in RAM instead of ROM.
 # In this case, emutos.img needs to be loaded into RAM by some loader.
 #
@@ -1030,6 +1109,7 @@ logo_compressor: tools/logo_compressor.c
 	$(NATIVECC) $< -o $@
 $(LOGO_BASE)%c $(LOGO_BASE)%h: logo_compressor
 	./logo_compressor $(LOGO_BASE).c $(LOGO_BASE).h
+
 
 #
 # Special ROM support
@@ -1308,7 +1388,7 @@ TOCLEAN += *.sym
 # checkindent - check for indent warnings, but do not alter files
 #
 
-INDENTFILES = bdos/*.c bios/*.c util/*.c tools/*.c desk/*.c aes/*.c vdi/*.c
+INDENTFILES = bdos/*.c bios/*.c util/*.c tools/*.c desk/*.c aes/*.c vdi/*.c foenix/*.c
 
 .PHONY: checkindent
 checkindent:

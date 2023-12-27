@@ -17,7 +17,7 @@
  * option any later version.  See doc/license.txt for details.
  */
 
-/* #define ENABLE_KDEBUG */
+// #define ENABLE_KDEBUG 
 
 #include "emutos.h"
 #include "biosext.h"
@@ -29,6 +29,7 @@
 #include "lineavars.h"
 #include "vt52.h"
 #include "processor.h"
+#include "initinfo.h"
 #include "machine.h"
 #include "has.h"
 #include "cookie.h"
@@ -49,6 +50,7 @@
 #include "asm.h"
 #include "chardev.h"
 #include "blkdev.h"
+#include "disk.h"
 #include "parport.h"
 #include "serport.h"
 #include "string.h"
@@ -58,14 +60,20 @@
 #include "memory.h"
 #include "nova.h"
 #include "tosvars.h"
-#include "version.h"
 #include "amiga.h"
 #include "lisa.h"
 #include "coldfire.h"
+#include "a2560u_bios.h"
+
+#if WITH_CLI
+#include "../cli/clistub.h"
+#endif
+
 
 /*==== Defines ============================================================*/
 
 #define DBGBIOS 0               /* If you want to enable debug wrappers */
+#define ENABLE_RESET_RESIDENT 0 /* enable to run "reset-resident" code (see below) */
 
 /*==== External declarations ==============================================*/
 
@@ -82,115 +90,49 @@ long setup_68040_pmmu(void);        /* defined in 68040_pmmu.S */
 #endif
 
 extern UBYTE osxhbootdelay;         /* defined in OSXH header in startup.S */
+extern PFVOID vbl_list[8];          /* default array for vblqueue */
 
 /*==== Declarations =======================================================*/
 
-/* used by kprintf() */
-WORD boot_status;               /* see kprint.h for bit flags */
 
-static void display_startup_msg(void);
+
+/* Boot flags */
+UBYTE bootflags;
 
 /* Non-Atari hardware vectors */
 #if !CONF_WITH_MFP
 void (*vector_5ms)(void);       /* 200 Hz system timer */
 #endif
 
+static void bios_init(void);
+static void vecs_init(void);
+
 /*==== BOOT ===============================================================*/
 
 
 /*
- * setup all vectors
+ * biosmain - c part of the bios init code
+ *
+ * Print some status messages then handover to the BDOS
  */
 
-static void vecs_init(void)
+void biosmain(void)
 {
-#if !CONF_ATARI_HARDWARE
-    /* On Atari hardware, the first 2 longs of the address space are physically
-     * routed to the start of the ROM (instead of the start of the ST-RAM).
-     * On other machines, there is actual RAM at that place.
-     * To mimic Atari hardware behaviour, we copy the start of our OS there.
-     * This may improve compatibility with some Atari software,
-     * which may peek the OS version or reset address from there.
-     * As C forbids from dereferencing the NULL pointer, we use assembly. */
-    __asm__ volatile
-    (
-        "move.l  %0,a0\n\t"         /* a0 = ROM */
-        "suba.l  a1,a1\n\t"         /* a1 = 0 */
-        "move.l  (a0)+,(a1)+\n\t"   /* Reset: Initial SSP */
-        "move.l  (a0),(a1)"         /* Reset: Initial PC */
-    : /* outputs */
-    : "g"(&os_header) /* inputs */
-    : "a0", "a1", "cc" AND_MEMORY
-    );
+    bios_init();                /* Initialize the BIOS */
+
+    bdos_bootstrap();
+
+#if CONF_WITH_SHUTDOWN
+    /* try to shutdown the machine / close the emulator */
+    shutdown();
 #endif
 
-    /* Initialize the exception vectors.
-     * By default, any unexpected exception calls dopanic().
-     */
-    init_exc_vec();
-    init_user_vec();
+    /* hide cursor */
+    cprintf("\033f");
 
-    /* Some user drivers may install interrupt handlers and call the previous
-     * ones. For example, ARAnyM's network driver for MiNT (nfeth.xif) and fVDI
-     * driver (aranym.sys) install custom handlers on INT3, and call the
-     * previous one. This panics with "Exception number 27" if VEC_LEVEL3 is
-     * not initialized with a valid default handler.
-     */
-    VEC_LEVEL1 = just_rte;
-    VEC_LEVEL2 = just_rte;
-    VEC_LEVEL3 = just_rte;
-    VEC_LEVEL4 = just_rte;
-    VEC_LEVEL5 = just_rte;
-    VEC_LEVEL6 = just_rte;
-    VEC_LEVEL7 = just_rte;
-
-#ifdef __mcoldfire__
-    /* On ColdFire, when a zero divide exception occurs, the PC value in the
-     * exception frame points to the offending instruction, not the next one.
-     * If we put a simple rte in the exception handler, this will result in
-     * an endless loop.
-     * New ColdFire programs are supposed to be clean and avoid zero
-     * divides. So we keep the default panic() behaviour in such case. */
-#else
-    /* Original TOS cowardly ignores integer divide by zero. */
-    VEC_DIVNULL = just_rte;
-#endif
-
-    /* initialise some vectors we really need */
-    VEC_GEM = vditrap;
-    VEC_BIOS = biostrap;
-    VEC_XBIOS = xbiostrap;
-    VEC_LINEA = int_linea;
-
-    /* Emulate some instructions unsupported by the processor. */
-#ifdef __mcoldfire__
-    /* On ColdFire, all the unsupported assembler instructions
-     * will be emulated by a specific emulation layer loaded later. */
-#else
-    if (longframe) {
-        /* On 68010+, "move from sr" called from user mode causes a
-         * privilege violation. This instruction must be emulated for
-         * compatibility with 68000 processors. */
-        VEC_PRIVLGE = int_priv;
-    } else {
-        /* On 68000, "move from ccr" is unsupported and causes an illegal
-         * instruction exception. This instruction must be emulated for
-         * compatibility with higher processors. */
-        VEC_ILLEGAL = int_illegal;
-    }
-#endif
-#if CONF_WITH_ADVANCED_CPU
-    /* On the 68060, instructions that were implemented in earlier
-     * processors but not in the 68060 cause this trap to be taken,
-     * for the purposes of emulation. The only instruction currently
-     * emulated is movep; fortunately this is both the simplest and
-     * commonest.
-     */
-    VEC_UNIMPINT = int_unimpint;
-#endif
+    kcprintf(_("System halted!\n"));
+    halt();
 }
-
-extern PFVOID vbl_list[8]; /* Default array for vblqueue */
 
 /*
  * Initialize the BIOS
@@ -268,8 +210,7 @@ static void bios_init(void)
     KDEBUG(("font_init()\n"));
     font_init();        /* initialize font ring (requires cookie_akp) */
 
-#if !MPS_STF && !MPS_STE
-  #if CONF_WITH_BLITTER
+#if CONF_WITH_BLITTER
     /*
      * If a PAK 68/3 is installed, the blitter cannot access the PAK ROMs.
      * So we must mark the blitter as not installed (this is what the
@@ -279,7 +220,6 @@ static void bios_init(void)
     if ((mcpu == 30)
      && ((cookie_mch == MCH_ST) || (cookie_mch == MCH_STE) || (cookie_mch == MCH_MSTE)))
         has_blitter = 0;
-  #endif
 #endif
 
     /*
@@ -352,6 +292,7 @@ static void bios_init(void)
     swv_vec = just_rts;
 
     /* setup default VBL queue with vbl_list[] */
+    KDEBUG(("VBL queue\n"));
     nvbls = ARRAY_SIZE(vbl_list);
     vblqueue = vbl_list;
     {
@@ -361,6 +302,14 @@ static void bios_init(void)
         }
     }
 
+   /* Initialize the RS-232 port(s) */
+    KDEBUG(("chardev_init()\n"));
+    chardev_init();     /* Initialize low-memory bios vectors */
+    boot_status |= CHARDEV_AVAILABLE;   /* track progress */
+    KDEBUG(("init_serport()\n"));
+    init_serport();
+    boot_status |= RS232_AVAILABLE;     /* track progress */
+
     /*
      * Initialize the system 200 Hz timer (timer C on Atari hardware).
      * Note that init_system_timer() no longer enables the 50 Hz processing
@@ -368,7 +317,7 @@ static void bios_init(void)
      * enable interrupts earlier (so that the interrupt-driven serial port
      * routines work), even though we haven't yet initialised the sound &
      * keyboard repeat stuff.
-     */
+     */     
     KDEBUG(("init_system_timer()\n"));
     init_system_timer();
 
@@ -385,15 +334,13 @@ static void bios_init(void)
     set_sr(0x2300);
 #else
     set_sr(0x2000);
+# ifdef MACHINE_A2560U
+    a2560u_timer_enable(HZ200_TIMER_NUMBER,true);
+    a2560u_irq_enable(INT_SOF_A);
+# endif
+
 #endif
 
-    /* Initialize the RS-232 port(s) */
-    KDEBUG(("chardev_init()\n"));
-    chardev_init();     /* Initialize low-memory bios vectors */
-    boot_status |= CHARDEV_AVAILABLE;   /* track progress */
-    KDEBUG(("init_serport()\n"));
-    init_serport();
-    boot_status |= RS232_AVAILABLE;     /* track progress */
 #if CONF_WITH_SCC
     if (has_scc)
         boot_status |= SCC_AVAILABLE;   /* track progress */
@@ -409,11 +356,6 @@ static void bios_init(void)
     KDEBUG(("snd_init()\n"));
     snd_init();         /* Reset Soundchip, deselect floppies */
 
-    if (FIRST_BOOT)
-        coldbootsound();
-    else
-        warmbootsound();
-
     /*
      * Initialise the two ACIA devices (MIDI and KBD), then initialise
      * the associated IORECs & vectors
@@ -426,6 +368,9 @@ static void bios_init(void)
     init_acia_vecs();   /* Init the ACIA interrupt vector and related stuff */
     KDEBUG(("after init_acia_vecs()\n"));
     boot_status |= MIDI_AVAILABLE;  /* track progress */
+
+    KDEBUG(("linea_mouse_init()\n")); /* we have to do that after keyboard vectors are setup */
+    linea_mouse_init();
 
     /* Enable 50 Hz processing */
     timer_c_sieve = 0x1111;
@@ -485,7 +430,7 @@ static void bios_init(void)
     if (HAS_NOVA && !(kbshift(-1) & MODE_CTRL)) {
         KDEBUG(("init_nova()\n"));
         if (init_nova()) {
-            set_rez_hacked();   /* also reinitializes the vt52 console */
+            screen_set_rez_hacked();   /* also reinitializes the vt52 console */
         }
     }
 #endif
@@ -496,12 +441,17 @@ static void bios_init(void)
     nls_set_lang(get_lang_name());
 #endif
 
+    /* Set start of user interface.
+     * No need to check if os_header.os_magic->gm_magic == GEM_MUPB_MAGIC,
+     * as this is always true. */
+    exec_os = os_header.os_magic->gm_init;
+
 #if CONF_WITH_ALT_RAM
-    /* Detect Alt-RAM */
-    KDEBUG(("altram_init()\n"));
+    /* RegisterAlt-RAM */
+    KDEBUG(("altram_init()..."));
     altram_init();
+    KDEBUG(("DONE\n"));
 #endif
-    boot_status |= DOS_AVAILABLE;   /* track progress */
 
     /* Enable VBL processing */
     swv_vec = os_header.reseth; /* reset system on monitor change & jump to _main */
@@ -522,7 +472,7 @@ static void bios_init(void)
 
         if ((V_REZ_HZ != save_hz) || (V_REZ_VT != save_vt) || (v_planes != save_pl))
         {
-            set_rez_hacked();   /* also reinitializes the vt52 console */
+            screen_set_rez_hacked();   /* also reinitializes the vt52 console */
         }
     }
 #endif
@@ -530,47 +480,137 @@ static void bios_init(void)
     KDEBUG(("bios_init() end\n"));
 }
 
+/*
+ * setup all vectors
+ */
 
-#if DETECT_NATIVE_FEATURES
-
-void natfeat_bootstrap(const char *env)
+static void vecs_init(void)
 {
-    /* start the kernel provided by the emulator */
-    PD *pd;
-    LONG length;
-    LONG r;
-    char args[128];
+#if !CONF_ATARI_HARDWARE
+    /* On Atari hardware, the first 2 longs of the address space are physically
+     * routed to the start of the ROM (instead of the start of the ST-RAM).
+     * On other machines, there is actual RAM at that place.
+     * To mimic Atari hardware behaviour, we copy the start of our OS there.
+     * This may improve compatibility with some Atari software,
+     * which may peek the OS version or reset address from there.
+     * As C forbids from dereferencing the NULL pointer, we use assembly. */
+    __asm__ volatile
+    (
+        "move.l  %0,a0\n\t"         /* a0 = ROM */
+        "suba.l  a1,a1\n\t"         /* a1 = 0 */
+        "move.l  (a0)+,(a1)+\n\t"   /* Reset: Initial SSP */
+        "move.l  (a0),(a1)"         /* Reset: Initial PC */
+    : /* outputs */
+    : "g"(&os_header) /* inputs */
+    : "a0", "a1", "cc" AND_MEMORY
+    );
+#endif
 
-    args[0] = '\0';
-    nf_getbootstrap_args(args, sizeof(args));
+    /* Initialize the exception vectors.
+     * By default, any unexpected exception calls dopanic().
+     */
+    init_exc_vec();
+    init_user_vec();
 
-    /* allocate space */
-    pd = (PD *) Pexec(PE_BASEPAGEFLAGS, (char*)PF_STANDARD, args, env);
+    /* Some user drivers may install interrupt handlers and call the previous
+     * ones. For example, ARAnyM's network driver for MiNT (nfeth.xif) and fVDI
+     * driver (aranym.sys) install custom handlers on INT3, and call the
+     * previous one. This panics with "Exception number 27" if VEC_LEVEL3 is
+     * not initialized with a valid default handler.
+     */
+    VEC_LEVEL1 = just_rte;
+    VEC_LEVEL2 = just_rte;
+    VEC_LEVEL3 = just_rte;
+    VEC_LEVEL4 = just_rte;
+    VEC_LEVEL5 = just_rte;
+    VEC_LEVEL6 = just_rte;
+    VEC_LEVEL7 = just_rte;
 
-    /* get the TOS executable from the emulator */
-    length = nf_bootstrap(pd->p_lowtpa + sizeof(PD), pd->p_hitpa - pd->p_lowtpa);
+#ifdef __mcoldfire__
+    /* On ColdFire, when a zero divide exception occurs, the PC value in the
+     * exception frame points to the offending instruction, not the next one.
+     * If we put a simple rte in the exception handler, this will result in
+     * an endless loop.
+     * New ColdFire programs are supposed to be clean and avoid zero
+     * divides. So we keep the default panic() behaviour in such case. */
+#elif !defined(MACHINE_A2560U)
+    /* Original TOS cowardly ignores integer divide by zero. */
+    VEC_DIVNULL = just_rte;
+#endif
 
-    /* free the allocated space if something is wrong */
-    if (length <= 0)
-        goto err;
+    /* initialise some vectors we really need */
+    VEC_GEM = vditrap;
+    VEC_BIOS = biostrap;
+    VEC_XBIOS = xbiostrap;
+    VEC_LINEA = int_linea;
 
-    /* relocate the loaded executable */
-    r = Pexec(PE_RELOCATE, (char *)length, (char *)pd, env);
-    if (r != (LONG)pd)
-        goto err;
-
-    /* set the boot drive for the new OS to use */
-    bootdev = nf_getbootdrive();
-
-    /* execute the relocated process */
-    Pexec(PE_GO, "", (char *)pd, env);
-
-err:
-    Mfree(pd->p_env); /* Mfree() the environment */
-    Mfree(pd); /* Mfree() the process area */
+    /* Emulate some instructions unsupported by the processor. */
+#ifdef __mcoldfire__
+    /* On ColdFire, all the unsupported assembler instructions
+     * will be emulated by a specific emulation layer loaded later. */
+#else
+    if (longframe) {
+        /* On 68010+, "move from sr" called from user mode causes a
+         * privilege violation. This instruction must be emulated for
+         * compatibility with 68000 processors. */
+        VEC_PRIVLGE = int_priv;
+    } else {
+        /* On 68000, "move from ccr" is unsupported and causes an illegal
+         * instruction exception. This instruction must be emulated for
+         * compatibility with higher processors. */
+        VEC_ILLEGAL = int_illegal;
+    }
+#endif
+#if CONF_WITH_ADVANCED_CPU
+    /* On the 68060, instructions that were implemented in earlier
+     * processors but not in the 68060 cause this trap to be taken,
+     * for the purposes of emulation. The only instruction currently
+     * emulated is movep; fortunately this is both the simplest and
+     * commonest.
+     */
+    VEC_UNIMPINT = int_unimpint;
+#endif
 }
 
-#endif /* DETECT_NATIVE_FEATURES */
+
+#if ENABLE_RESET_RESIDENT
+/*
+ * run_reset_resident - run "reset-resident" code
+ *
+ * "Reset-resident" code is code that has been loaded into RAM prior
+ * to a warm boot.  It has a special header with a magic number, it
+ * is 512 bytes long (aligned on a 512-byte boundary), and it has a
+ * specific checksum (calculated on a word basis).
+ *
+ * Note: this is an undocumented feature of TOS that exists in all
+ * versions of Atari TOS.
+ */
+struct rrcode {
+    long magic;
+    struct rrcode *pointer;
+    char program[502];
+    short chksumfix;
+};
+#define RR_MAGIC    0x12123456L
+#define RR_CHKSUM   0x5678
+
+static void run_reset_resident(void)
+{
+    const struct rrcode *p = (const struct rrcode *)phystop;
+
+    for (--p; p > (struct rrcode *)&etv_timer; p--)
+    {
+        if (p->magic != RR_MAGIC)
+            continue;
+        if (p->pointer != p)
+            continue;
+        if (compute_cksum((const UWORD *)p) != RR_CHKSUM)
+            continue;
+        regsafe_call(p->program);
+    }
+}
+#endif
+
 
 #if CONF_WITH_SHUTDOWN
 
@@ -610,37 +650,6 @@ BOOL can_shutdown(void)
 }
 
 #endif /* CONF_WITH_SHUTDOWN */
-
-/*
- * biosmain - c part of the bios init code
- *
- * Print some status messages
- * exec the user interface (shell or AES)
- */
-
-void biosmain(void)
-{
-    bios_init();                /* Initialize the BIOS */
-
-    /* Set start of user interface.
-     * No need to check if os_header.os_magic->gm_magic == GEM_MUPB_MAGIC,
-     * as this is always true. */
-    exec_os = os_header.os_magic->gm_init;
-
-    bdos_bootstrap();
-
-#if CONF_WITH_SHUTDOWN
-    /* try to shutdown the machine / close the emulator */
-    shutdown();
-#endif
-
-    /* hide cursor */
-    cprintf("\033f");
-
-    kcprintf(_("System halted!\n"));
-    halt();
-}
-
 
 /**
  * bios_0 - (getmpb) Load Memory parameter block
@@ -824,6 +833,7 @@ static LONG bios_4(WORD r_w, UBYTE *adr, WORD numb, WORD first, WORD drive, LONG
 #endif
 
 
+
 /**
  * Setexc - set exception vector
  *
@@ -973,6 +983,7 @@ LONG drvmap(void)
 #if DBGBIOS
 static LONG bios_a(void)
 {
+	KDEBUG(("BIOS 10: Drvmap()\n"));
     return drvmap();
 }
 #endif
@@ -1001,14 +1012,27 @@ static LONG bios_b(WORD flag)
 #endif
 
 
+#if DBGBIOS
+static LONG bios_c(void) { return (LONG)bmem_gettpa(); }
+static LONG bios_d(BOOL fromTop, ULONG size)
+{
+	KDEBUG(("BIOS 13: Balloc(0x%08lx,%s)\n",size,fromTop ? "fromTop" : "fromBottom"));
+	return (LONG)balloc_stram(size,fromTop);
+}
+static LONG bios_e(void) { return disk_drvrem(); }
+#endif
+
+
+
 /**
  * bios_vecs - the table of bios command vectors.
  */
 
+/* PFLONG defined in bios/vectors.h */
 #if DBGBIOS
-#define VEC(wrapper, direct) (PFLONG) wrapper
+  #define VEC(wrapper, direct) (PFLONG) wrapper
 #else
-#define VEC(wrapper, direct) (PFLONG) direct
+  #define VEC(wrapper, direct) (PFLONG) direct
 #endif
 
 const PFLONG bios_vecs[] = {
@@ -1024,6 +1048,10 @@ const PFLONG bios_vecs[] = {
     VEC(bios_9, mediach),
     VEC(bios_a, drvmap),
     VEC(bios_b, kbshift),
+    /* GenX OS extensions */
+    VEC(bios_c, bmem_gettpa),  // We could also have a variable Bgetvar which returns a union... */
+    VEC(bios_d, balloc_stram), // $d balloc_stram(ULONG size, BOOL fromTop): allocates memory, resizing the TPA. Should only be called before running the BDOS.
+    VEC(bios_e, disk_drvrem)   // $e LONG Bdrvmem(void): like _drvmem system variable, returns bitfield of drives supporting media change.
 };
 
 const UWORD bios_ent = ARRAY_SIZE(bios_vecs);
@@ -1038,8 +1066,3 @@ BOOL is_text_pointer(const void *p)
 }
 
 #endif /* CONF_WITH_EXTENDED_MOUSE */
-
-static void display_startup_msg(void)
-{
-    cprintf("EmuTOS Version %s\r\n", version);
-}

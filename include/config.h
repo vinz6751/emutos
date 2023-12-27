@@ -403,6 +403,9 @@
 # ifndef CONF_WITH_FALCON_MMU
 #  define CONF_WITH_FALCON_MMU 0
 # endif
+# ifndef CONF_WITH_68030_PMMU
+#  define CONF_WITH_68030_PMMU 0
+# endif
 # ifndef CONF_WITH_NVRAM
 #  define CONF_WITH_NVRAM 0
 # endif
@@ -648,6 +651,95 @@
 #endif
 
 /*
+ * Defaults for the C256 Foenix GenX machine with 68000 CPU Module
+ */
+#ifdef MACHINE_C256FOENIXGENX
+# ifndef CONF_ATARI_HARDWARE
+#  define CONF_ATARI_HARDWARE 0
+# endif
+# ifndef CONF_WITH_IDE
+#  define CONF_WITH_IDE 0 /* Not supported yet */
+# endif
+# ifndef CONF_DETECT_FIRST_BOOT_WITHOUT_MEMCONF
+#  define CONF_DETECT_FIRST_BOOT_WITHOUT_MEMCONF 0
+# endif
+# ifdef WITH_AES
+#  undef WITH_AES
+# endif
+# define WITH_AES 0 /* Not supported yet */
+# ifndef WITH_CLI
+#  define WITH_CLI 1 /* Doesn't work yet but we need to startup something... */
+# endif
+#endif
+
+
+/*
+ * Defaults for the A2560U from Foenix Retro Systems
+ */
+#ifdef MACHINE_A2560U
+# ifndef MACHINE_A2560U_DEBUG
+#  define MACHINE_A2560U_DEBUG 0
+# endif
+
+# ifndef CONF_ATARI_HARDWARE
+#  define CONF_ATARI_HARDWARE 0
+# endif
+# ifndef CONF_WITH_IDE
+#  define CONF_WITH_IDE 1
+# endif
+# ifndef CONF_WITH_SDMMC
+#  define CONF_WITH_SDMMC 1
+# endif
+# ifndef CONF_DETECT_FIRST_BOOT_WITHOUT_MEMCONF
+#  define CONF_DETECT_FIRST_BOOT_WITHOUT_MEMCONF 0
+# endif
+# ifndef WITH_AES
+# define WITH_AES 0 /* Not supported yet */
+# endif
+# ifndef WITH_CLI
+#  define WITH_CLI 1
+# endif
+# ifndef CONF_WITH_SN76489
+#  define CONF_WITH_SN76489 1
+# endif
+# ifndef CONF_WITH_WM8776
+#  define CONF_WITH_WM8776 1
+# endif
+# ifndef CONF_WITH_BQ4802LY
+#  define CONF_WITH_BQ4802LY 1
+# endif
+#if 0
+# ifndef CONF_VRAM_ADDRESS
+#  define CONF_VRAM_ADDRESS 0x00c00000 /* VRAM is at a special location */
+# endif
+#endif
+# ifndef CONF_WITH_CHUNKY8
+#  define CONF_WITH_CHUNKY8 1
+# endif
+/* At least one of CONF_WITH_A2560U_TEXT_MODE and CONF_WITH_A2560U_SHADOW_FRAMEBUFFER must be enabled */
+/* Use VICKY's text mode if possible rather than a bitmap screen buffer when using 8 pixel-high font.
+ * No graphics possible. */
+#define CONF_WITH_A2560U_TEXT_MODE 1
+/* Shadow framebuffer support (e.g. for rendering 8x16). Safe/recommended to leave enabled. */
+#define CONF_WITH_A2560U_SHADOW_FRAMEBUFFER 1
+# ifndef CONF_WITH_FORCE_8x8_FONT
+#  define CONF_WITH_FORCE_8x8_FONT 1
+# endif
+# ifndef ALWAYS_SHOW_INITINFO
+#  define ALWAYS_SHOW_INITINFO 1 /* So we can get into EmuCON */
+# endif
+# ifdef USE_STOP_INSN_TO_FREE_HOST_CPU /* To confirm: this causes a crash so we don't want it */
+#  undef USE_STOP_INSN_TO_FREE_HOST_CPU
+#  define USE_STOP_INSN_TO_FREE_HOST_CPU 0
+# endif
+
+#ifdef MACHINE_A2560U_DEBUG
+# define CONF_WITH_EXTENDED_MOUSE 0 /* Not supported (yet?) */
+# define RS232_DEBUG_PRINT 1
+#endif
+#endif
+
+/*
  * By default, EmuTOS is built for Atari ST/TT/Falcon compatible hardware
  */
 #ifndef CONF_ATARI_HARDWARE
@@ -787,6 +879,21 @@
 # endif
 # ifndef CONF_WITH_3D_OBJECTS
 #  define CONF_WITH_3D_OBJECTS 0 /* Like ST, not Falcon */
+# endif
+# ifndef CONF_WITH_SN767489
+#  define CONF_WITH_SN767489 0
+# endif
+# ifndef CONF_WITH_CHUNKY8
+#  define CONF_WITH_CHUNKY8 0
+# endif
+# ifndef CONF_WITH_FORCE_8x8_FONT
+#  define CONF_WITH_FORCE_8x8_FONT 0
+# endif
+# ifndef CONF_WITH_A2560U_TEXT_MODE
+#  define CONF_WITH_A2560U_TEXT_MODE 0
+# endif
+# ifndef CONF_WITH_A2560U_SHADOW_FRAMEBUFFER
+#  define CONF_WITH_A2560U_SHADOW_FRAMEBUFFER 0
 # endif
 #endif
 
@@ -2004,6 +2111,66 @@
 #ifndef CONF_WITH_BUS_ERROR
 # define CONF_WITH_BUS_ERROR 1
 #endif
+
+/*
+ * Set CONF_WITH_SN76489 if the machine has a SN76489 programmable sound generator.
+ * If this is defined, the driver requires SN76489_PORT to be defined as the address
+ * of the chip.
+ */
+#ifndef CONF_WITH_SN76489
+# define CONF_WITH_SN76489 0
+#endif
+
+/*
+ * Set CONF_WITH_WM8776 if the machine has a WM8776 audio codec.
+ * If this is defined, the driver requires WM8776_PORT to be defined as the address
+ * of the chip.
+ */
+#ifndef CONF_WITH_WM8776
+# define CONF_WITH_WM8776 0
+#endif
+
+/*
+ * Set CONF_WITH_BQ4802LY if the machine has a bq4802LY real time clock.
+ * If this is defined, the driver requires BQ4802LY_PORT to be defined as the address
+ * of the chip.
+ */
+#ifndef CONF_WITH_BQ4802LY
+# define CONF_WITH_BQ4802LY 0
+#endif
+
+/*
+ * Set CONF_WITH_CHUNKY8 if the machine uses a chunky frame buffer with 8 bytes
+ * per pixel.
+ */
+#ifndef CONF_WITH_CHUNKY8
+# define CONF_WITH_CHUNKY8 0
+#endif
+
+/*
+ * Set CONF_WITH_FORCE_8x8_FONT to force the use of the 8x8 font.
+ */
+#ifndef CONF_WITH_FORCE_8x8_FONT
+# define CONF_WITH_FORCE_8x8_FONT 0
+#endif
+
+/*
+ * Set CONF_WITH_A2560U_TEXT_MODE to support the 8x8 text mode supported by VICKY.
+ */
+#ifndef CONF_WITH_A2560U_TEXT_MODE
+# define CONF_WITH_A2560U_TEXT_MODE 0
+#endif
+
+/*
+ * Set CONF_WITH_A2560U_SHADOW_FRAMEBUFFER to add support for a shadow framebuffer that
+ * is in RAM but copied to VRAM during VBL.
+ */
+#ifndef CONF_WITH_A2560U_SHADOW_FRAMEBUFFER
+# define CONF_WITH_A2560U_SHADOW_FRAMEBUFFER 0
+#endif
+
+
+
 
 /*
  * Useful macros for both assembler and C

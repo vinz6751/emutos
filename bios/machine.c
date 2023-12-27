@@ -13,6 +13,7 @@
 /* #define ENABLE_KDEBUG */
 
 #include "emutos.h"
+#include "bios.h" /* boot_status */
 #include "cookie.h"
 #include "machine.h"
 #include "has.h"
@@ -42,6 +43,7 @@
 #include "nova.h"
 #include "biosext.h"
 #include "amiga.h"
+#include "a2560u_bios.h"
 
 #if CONF_WITH_ADVANCED_CPU
 UBYTE is_bus32; /* 1 if address bus is 32-bit, 0 if it is 24-bit */
@@ -293,7 +295,6 @@ static void detect_magnum(void)
 
 #endif /* CONF_WITH_MAGNUM */
 
-#if !MPS_BLITTER_ALWAYS_ON
 #if CONF_WITH_BLITTER
 
 /* blitter */
@@ -322,7 +323,7 @@ static void detect_blitter(void)
 }
 
 #endif /* CONF_WITH_BLITTER */
-#endif // MPS_BLITTER_ALWAYS_ON
+
 
 #if CONF_WITH_DIP_SWITCHES
 
@@ -372,6 +373,8 @@ static void setvalue_vdo(void)
         cookie_vdo = VDO_STE;
     else
         cookie_vdo = VDO_ST;
+#elif defined(MACHINE_A2560U)
+    cookie_vdo = MCH_A2560U;
 #else
     cookie_vdo = VDO_NOHARD;
 #endif /* CONF_ATARI_HARDWARE */
@@ -398,6 +401,8 @@ static void setvalue_mch(void)
     }
     else
         cookie_mch = MCH_ST;
+#elif defined(MACHINE_A2560U)
+    cookie_mch = MCH_A2560U;
 #else
     cookie_mch = MCH_NOHARD;
 #endif /* CONF_ATARI_HARDWARE */
@@ -595,7 +600,7 @@ void machine_detect(void)
 #if CONF_WITH_DIP_SWITCHES
     detect_dip_switches();
 #endif
-#if CONF_WITH_BLITTER && !MPS_BLITTER_ALWAYS_ON
+#if CONF_WITH_BLITTER
     detect_blitter();
 #endif
 
@@ -624,6 +629,11 @@ void machine_detect(void)
  */
 void machine_init(void)
 {
+#ifdef MACHINE_A2560U
+    a2560u_bios_init();
+    /* There is an early setup of the UART so we can use KDEBUG earlier. */
+    boot_status |= RS232_AVAILABLE;
+#endif
 #if !CONF_WITH_RESET
 /*
  * we must disable interrupts here, because the reset instruction hasn't
@@ -835,7 +845,14 @@ const char * machine_name(void)
     return "Apple Lisa";
 #elif defined(MACHINE_M548X)
     return m548x_machine_name();
+#elif defined(MACHINE_A2560U)
+    struct foenix_system_info_t info;
+
+    a2560u_system_info(&info);
+ 
+    return info.model_name;
 #else
+
     return guess_machine_name();
 #endif
 }

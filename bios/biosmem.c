@@ -149,3 +149,9 @@ void getmpb(MPB * mpb)
     mpb->mp_mfl = &themd;       /* free list set to initial MD */
     mpb->mp_mal = NULL;         /* allocated list empty */
 }
+
+TPA_AREA *bmem_gettpa(void)
+{
+    /* This supposes that memtop follows membot */
+    return (TPA_AREA*)&membot;
+}

@@ -52,7 +52,6 @@ struct dmasound
     UWORD microwire_data;       /* Microwire data register */
     UWORD microwire_mask;       /* Microwire mask register */
     UBYTE filler26[10];
-#if !MPS_STE_SOUND_ONLY
     /* Falcon DMA registers */
     UWORD crossbar_src;         /* Crossbar Source Controller */
     UWORD crossbar_dest;        /* Crossbar Destination Controller */
@@ -68,7 +67,6 @@ struct dmasound
     UBYTE gpx_data_direction;   /* GPx Data Direction */
     UBYTE filler42;
     UBYTE gpx_data_port;        /* GPx Data Port */
-#endif
 };
 
 #define DMASOUND ((volatile struct dmasound*)0xffff8900)
@@ -133,7 +131,11 @@ void detect_dmasound(void)
     has_dmasound = check_read_byte((long)&DMASOUND->control);
     KDEBUG(("has_dmasound = %d\n", has_dmasound));
 
-#if !MPS_STE_SOUND_ONLY
+#if MPS_STE_SOUND_ONLY
+    /* Stop all sound */
+    DMASOUND->control = 0;
+    has_microwire = has_dmasound;
+#else
     /* Then detect advanced Falcon DMA sound */
     if (has_dmasound)
     {
@@ -151,9 +153,6 @@ void detect_dmasound(void)
      * This is not detectable through a bus error. */
     has_microwire = has_dmasound && !has_falcon_dmasound;
     KDEBUG(("has_microwire = %d\n", has_microwire));
-#else
-    has_microwire = 1;
-    has_falcon_dmasound = 0;
 #endif
 }
 
@@ -189,7 +188,6 @@ static void lmc1992_init(void)
 
 static void falcon_dmasound_init(void)
 {
-#if !MPS_STE_SOUND_ONLY
     /*
      * connect DMA playback to DAC (headphone/speaker)
      * set clock = internal 25.175MHz
@@ -204,7 +202,6 @@ static void falcon_dmasound_init(void)
     soundcmd(4,0x0003);     /* set ADDER input to ADC & connection matrix */
     soundcmd(5,0x0003);     /* set L & R channel ADC source to PSG */
     soundcmd(6,0x0003);     /* set TT-compatible prescale to /160 = 50MHz */
-#endif
 }
 
 void dmasound_init(void)
@@ -213,12 +210,9 @@ void dmasound_init(void)
 
     lmc1992_init();
 
-#if !MPS_STE_SOUND_ONLY
     if (has_falcon_dmasound)
         falcon_dmasound_init();
-#endif
 }
-
 
 /* *** XBIOS DMA sound functions *** */
 
@@ -252,7 +246,7 @@ LONG unlocksnd(void)
     return 0;
 }
 
-#if !MPS_STE_SOUND_ONLY
+
 /**
  * Configure various sound settings of Falcon DMA sound
  */
@@ -314,7 +308,6 @@ static LONG sndcmd_falcon(WORD mode, WORD data)
 
     return 0;
 }
-#endif
 
 /**
  * Configure various sound settings of STE DMA sound
@@ -369,12 +362,10 @@ LONG soundcmd(WORD mode, WORD data)
         return modectrl & 0x3;
     }
 
-#if !MPS_STE_SOUND_ONLY
     if (has_falcon_dmasound)
     {
         return sndcmd_falcon(mode, data);
     }
-#endif
 
     return sndcmd_ste(mode, data);
 }
@@ -390,7 +381,6 @@ LONG setbuffer(UWORD mode, ULONG startaddr, ULONG endaddr)
     if (mode > 1 || (mode == 1 && !has_falcon_dmasound))
         return EBADRQ;
 
-#if !MPS_STE_SOUND_ONLY
     if (has_falcon_dmasound)
     {
         if (mode == 1)
@@ -398,7 +388,6 @@ LONG setbuffer(UWORD mode, ULONG startaddr, ULONG endaddr)
         else
             DMASOUND->control &= 0x7f;  /* Select replay frame registers */
     }
-#endif
 
     /* Set frame start address */
     DMASOUND->frame_start_high = (UBYTE)(startaddr >> 16);
@@ -444,13 +433,11 @@ LONG settracks(UWORD playtracks, UWORD rectracks)
     if (!SOUND_IS_AVAILABLE)
         return 0x85;    /* unimplemented xbios call: return function # */
 
-#if !MPS_STE_SOUND_ONLY
     if (playtracks > 3 || rectracks > 3 || !has_falcon_dmasound)
         return EBADRQ;
 
     DMASOUND->track_control = (DMASOUND->track_control & 0xfc) | playtracks;
     DMASOUND->record_tracks = rectracks;
-#endif
 
     return 0;
 }
@@ -463,16 +450,12 @@ LONG setmontracks(UWORD montrack)
     if (!SOUND_IS_AVAILABLE)
         return 0x86;    /* unimplemented xbios call: return function # */
 
-#if !MPS_STE_SOUND_ONLY
-    return EBADRQ;
-#else
     if (montrack > 3 || !has_falcon_dmasound)
         return EBADRQ;
 
     DMASOUND->track_control = (DMASOUND->track_control&0xcf) | (montrack << 4);
 
     return 0;
-#endif
 }
 
 /**
@@ -530,10 +513,8 @@ LONG buffoper(WORD mode)
         LONG ret;
         UBYTE ctrl = DMASOUND->control;
         ret = ctrl & 0x3;
-#if !MPS_STE_SOUND_ONLY
         if (has_falcon_dmasound)
             ret |= ((ctrl >> 2) & 0xc);
-#endif
         return ret;
     }
 
@@ -549,12 +530,9 @@ LONG dsptristate(WORD dspxmit, WORD dsprec)
     if (!SOUND_IS_AVAILABLE)
         return 0x89;    /* unimplemented xbios call: return function # */
 
-#if !MPS_STE_SOUND_ONLY
     if (!has_falcon_dmasound)
-#endif
         return EBADRQ;
 
-#if !MPS_STE_SOUND_ONLY
     if (dspxmit)
         DMASOUND->crossbar_src |= 0x0080;
     else
@@ -566,7 +544,6 @@ LONG dsptristate(WORD dspxmit, WORD dsprec)
         DMASOUND->crossbar_dest &= ~0x0080;
 
     return 0;
-#endif
 }
 
 /**
@@ -577,9 +554,6 @@ LONG gpio(UWORD mode, UWORD data)
     if (!SOUND_IS_AVAILABLE)
         return 0x8a;    /* unimplemented xbios call: return function # */
 
-#if MPS_STE_SOUND_ONLY
-    return EBADRQ;
-#else
     switch (mode)
     {
      case 0:             /* Set direction */
@@ -595,10 +569,8 @@ LONG gpio(UWORD mode, UWORD data)
     }
 
     return 0;
-#endif
 }
 
-#if !MPS_STE_SOUND_ONLY
 /**
  * Devconnect for Falcon hardware
  *
@@ -621,7 +593,6 @@ LONG gpio(UWORD mode, UWORD data)
  */
 static LONG devconnect_falcon(WORD source, WORD dest, WORD clk, WORD prescale, WORD protocol)
 {
-
     UWORD data;
 
     /*
@@ -717,7 +688,6 @@ static LONG devconnect_falcon(WORD source, WORD dest, WORD clk, WORD prescale, W
 
     return 1;
 }
-#endif
 
 /**
  * Provide STE/TT compatible frequency setting
@@ -757,10 +727,8 @@ LONG devconnect(WORD source, WORD dest, WORD clk, WORD prescale, WORD protocol)
     if (!SOUND_IS_AVAILABLE)
         return 0x8b;    /* unimplemented xbios call: return function # */
 
-#if !MPS_STE_SOUND_ONLY
     if (has_falcon_dmasound)
         return devconnect_falcon(source, dest, clk, prescale, protocol);
-#endif
 
     return devconnect_ste(source, dest, clk, prescale, protocol);
 }
@@ -789,12 +757,9 @@ LONG sndstatus(WORD reset)
     if (!SOUND_IS_AVAILABLE)
         return 0x8c;    /* unimplemented xbios call: return function # */
 
-#if !MPS_STE_SOUND_ONLY
     if (!has_falcon_dmasound)
-#endif
         return 0;
 
-#if !MPS_STE_SOUND_ONLY
     if (reset)
     {
         DMASOUND->channel_attenuation = 0x0000;
@@ -803,7 +768,6 @@ LONG sndstatus(WORD reset)
     }
 
     return (DMASOUND->codec_status >> 4) & 0x3f;
-#endif
 }
 
 /**
@@ -824,7 +788,6 @@ LONG buffptr(LONG ptr)
 
     sbp = (struct SndBufPtr *)ptr;
 
-#if !MPS_STE_SOUND_ONLY
     if (has_falcon_dmasound)
     {
         DMASOUND->control |= 0x80;  /* Select recording frame registers */
@@ -834,7 +797,6 @@ LONG buffptr(LONG ptr)
         sbp->record = ((ULONG)hi << 16) | ((ULONG)mid << 8) | low;
         DMASOUND->control &= 0x7f;  /* Select replay frame registers */
     }
-#endif
 
     hi = DMASOUND->frame_counter_high;
     mid = DMASOUND->frame_counter_mid;

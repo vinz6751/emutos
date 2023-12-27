@@ -93,4 +93,8 @@ extern ULONG mcpu;
 extern ULONG fputype;
 extern WORD longframe;
 
+#if CONF_WITH_APOLLO_68080
+extern BOOL is_apollo_68080;
+#endif
+
 #endif /* PROCESSOR_H */

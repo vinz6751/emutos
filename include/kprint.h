@@ -15,6 +15,14 @@
 #ifndef KPRINT_H
 #define KPRINT_H
 
+/* Tracks the availability of debug output devices */
+extern WORD boot_status;
+#define RS232_AVAILABLE 0x01
+#define MIDI_AVAILABLE  0x02
+#define DOS_AVAILABLE   0x04
+#define SCC_AVAILABLE   0x08
+#define CHARDEV_AVAILABLE 0x10
+
 /* console output */
 int cprintf(const char *RESTRICT fmt, ...) PRINTF_STYLE;
 

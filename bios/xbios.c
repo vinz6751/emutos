@@ -38,6 +38,7 @@
 #include "asm.h"
 #include "vectors.h"
 #include "xbios.h"
+#include "a2560u_bios.h"
 
 #define DBG_XBIOS        0
 
@@ -885,9 +886,6 @@ static WORD xbios_2e(WORD op, WORD start, WORD count, UBYTE *buffer)
  */
 static WORD blitmode(WORD mode)
 {
-#if MPS_BLITTER_ALWAYS_ON
-    return  1 << 1;
-#else
 #if CONF_WITH_BLITTER
     WORD status = 0x0000;
 
@@ -903,7 +901,6 @@ static WORD blitmode(WORD mode)
 #else
     return 0x0000;
 #endif
-#endif // MPS_BLITTER_ALWAYS_ON
 }
 
 #if DBG_XBIOS
@@ -1171,7 +1168,7 @@ static void xbios_7f(LONG sendnum, LONG rcvnum, DSPBLOCK *sendinfo, DSPBLOCK *rc
 /*
  * DMA sound
  */
-#if DBG_XBIOS & CONF_WITH_DMASOUND
+#if DBG_XBIOS & CONF_WITH_XBIOS_SOUND
 static LONG xbios_80(void)
 {
     kprintf("XBIOS: Locksnd\n");
@@ -1278,7 +1275,7 @@ LONG supexec(PFLONG);       /* defined in vectors.S */
 # define LAST_ENTRY 0x8d
 #elif CONF_WITH_DSP
 # define LAST_ENTRY 0x7f
-#elif CONF_WITH_VIDEL
+#elif CONF_WITH_VIDEL || defined(MACHINE_A2560U)
 # define LAST_ENTRY 0x5f
 #elif CONF_WITH_TT_SHIFTER
 # define LAST_ENTRY 0x57
@@ -1421,6 +1418,15 @@ const PFLONG xbios_vecs[] = {
     VEC(xbios_5d, vsetrgb),   /* 5d */
     VEC(xbios_5e, vgetrgb),   /* 5e */
     VEC(xbios_5f, vfixmode),  /* 5f */
+#elif defined(MACHINE_A2560U)
+    (PFLONG)a2560u_bios_vsetmode,   /* 58 */
+    (PFLONG)a2560u_bios_vmontype,   /* 59 */
+    xbios_unimpl,   /* 5a vsetsync not implemented */
+    (PFLONG)a2560u_bios_vgetsize,   /* 5b */
+    xbios_unimpl,   /* 5c */
+    (PFLONG)a2560u_bios_vsetrgb,   /* 5d */
+    (PFLONG)a2560u_bios_vgetrgb,   /* 5e */
+    xbios_unimpl,   /* vfixmode mode not implemented 5f because the Foenix uses chunky modes, nothing in common with the Atari */
 #elif LAST_ENTRY > 0x5f     /* must insert fillers for videl opcodes */
     xbios_unimpl,   /* 58 */
     xbios_unimpl,   /* 59 */
@@ -1500,7 +1506,7 @@ const PFLONG xbios_vecs[] = {
     xbios_unimpl,   /* 7f */
 #endif
 
-#if CONF_WITH_DMASOUND
+#if CONF_WITH_XBIOS_SOUND
     VEC(xbios_80, locksnd),     /* 80 */
     VEC(xbios_81, unlocksnd),   /* 81 */
     VEC(xbios_82, soundcmd),    /* 82 */
@@ -1515,7 +1521,7 @@ const PFLONG xbios_vecs[] = {
     VEC(xbios_8b, devconnect),  /* 8b */
     VEC(xbios_8c, sndstatus),   /* 8c */
     VEC(xbios_8d, buffptr),     /* 8d */
-#endif /* CONF_WITH_DMASOUND */
+#endif /* CONF_WITH_XBIOS_SOUND */
 };
 
 const UWORD xbios_ent = ARRAY_SIZE(xbios_vecs);

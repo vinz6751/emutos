@@ -32,7 +32,6 @@
 #include "string.h"
 #include "bdosstub.h"
 #include "tosvars.h"
-#include "biosext.h"
 
 /*
 **  externals
@@ -279,7 +278,6 @@ static const FND funcs[] =
 };
 #define MAX_FNCALL (ARRAY_SIZE(funcs) - 1)
 
-
 /*
  * install trap handlers
  */
@@ -292,6 +290,8 @@ void bdos_install_traps(void)
     /* Intercept TRAP #2 only for xterm(), keeping the old value
      * so that our trap handler can call the old one */
     old_trap2 = (PFVOID) Setexc(0x22, (long)bdos_trap2);
+    
+    boot_status |= DOS_AVAILABLE;   /* track progress */
 }
 
 /*
@@ -311,6 +311,7 @@ static long ni(void)
 {
     return EINVFN;
 }
+
 
 /*
  *  freetree -  free the directory node tree

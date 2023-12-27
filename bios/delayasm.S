@@ -11,6 +11,10 @@
  * option any later version.  See doc/license.txt for details.
  */
 
+#include "config.h"
+
+#if CONF_WITH_MFP
+
 #include "asmdefs.h"
 
         .globl  _run_calibration
@@ -118,3 +122,5 @@ handle_timer:                   //68000:
         .bss
 intcount: .ds.l 1
 intsave:  .ds.l 1
+
+#endif /* CONF_WITH_MFP */

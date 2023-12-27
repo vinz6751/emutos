@@ -29,7 +29,6 @@
 #include "mforms.h"
 #include "xbiosbind.h"
 #include "has.h"
-#include "../bdos/bdosstub.h"
 #include "biosext.h"
 #include "miscutil.h"
 
@@ -57,10 +56,10 @@
 #include "aesdefs.h"
 #include "aesext.h"
 #include "aesstub.h"
+#include "shellutl.h"
 
 #include "string.h"
 #include "tosvars.h"
-#include "shellutl.h"
 
 /* Prototypes: */
 void accdesk_start(void) NORETURN;  /* called only from gemstart.S */
@@ -134,6 +133,7 @@ GLOBAL SPB      wind_spb;
 GLOBAL WORD     curpid;
 
 GLOBAL THEGLO   D;
+
 
 
 /*
@@ -266,9 +266,8 @@ static WORD count_accs(void)
 
     shellutl_getenv(ad_envrn, accpathvar, &accpath);
     if (accpath == NULL)
-	accpath = "";
+        accpath = "";
     sprintf(D.g_work,"%s\\*.ACC", accpath);
-
     dos_sdta(&D.g_dta);
 
     for (i = 0; i < NUM_ACCS; i++)

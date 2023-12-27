@@ -26,15 +26,12 @@ LONG getbpb(WORD drive);
 LONG bcostat(WORD handle);
 LONG mediach(WORD drv);
 LONG drvmap(void);
+TPA_AREA *bmem_gettpa(void);
 
 /* utility functions */
 #if CONF_SERIAL_CONSOLE_ANSI
 void bconout_str(WORD handle, const char* str);
 #endif
-
-/* Line-A functions */
-void linea_init(void); /* initialize variables */
-void set_screen_shift(void);    /* set shift amount for screen address calcs */
 
 /* functions below implemented in panicasm.S */
 
@@ -80,12 +77,5 @@ extern UBYTE _static_altram_end[];
 #define WARM_MAGIC 0x5741524D /* 'WARM' */
 extern ULONG warm_magic;
 #endif
-
-extern WORD boot_status;
-#define RS232_AVAILABLE 0x01
-#define MIDI_AVAILABLE  0x02
-#define DOS_AVAILABLE   0x04
-#define SCC_AVAILABLE   0x08
-#define CHARDEV_AVAILABLE 0x10
 
 #endif /* BIOS_H */

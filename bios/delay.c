@@ -16,9 +16,9 @@
 #include "biosdefs.h"
 #include "mfp.h"
 #include "serport.h"
-#include "biosext.h" /* for is_apollo_68080 */
 #include "processor.h"
 #include "delay.h"
+#include "a2560u_bios.h"
 #include "coldfire.h" /* For cookie jar info. */
 
 /*
@@ -61,6 +61,11 @@ void init_delay(void)
     */
 
     loopcount_1_msec = 133UL * 1000;
+
+#elif defined(MACHINE_A2560U)
+    /* The A2560U's 68EC000 is running at 20MHz while LOOPS_68000 is for 16MHz*/
+    loopcount_1_msec = LOOPS_68000 * 5 / 4;
+
 #else
 # if CONF_WITH_APOLLO_68080
     if (is_apollo_68080)
@@ -94,7 +99,9 @@ void init_delay(void)
  */
 void calibrate_delay(void)
 {
-#if CONF_WITH_MFP
+#ifdef MACHINE_A2560U
+    a2560u_bios_calibrate_delay(CALIBRATION_TIME * loopcount_1_msec);
+#elif CONF_WITH_MFP
     ULONG loopcount, intcount;
 
     /*

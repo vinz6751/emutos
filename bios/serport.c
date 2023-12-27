@@ -27,6 +27,7 @@
 #include "vectors.h"
 #include "coldfire.h"
 #include "amiga.h"
+#include "a2560u_bios.h"
 #include "ikbd.h"
 
 /*
@@ -181,7 +182,7 @@ static LONG get_iorecbuf(IOREC *in)
 
     /* disable interrupts */
     old_sr = set_sr(0x2700);
-
+    
     in->head++;
     if (in->head >= in->size) {
         in->head = 0;
@@ -190,7 +191,7 @@ static LONG get_iorecbuf(IOREC *in)
 
     /* restore interrupts */
     set_sr(old_sr);
-
+    
     return value;
 }
 
@@ -278,6 +279,8 @@ LONG bcostat1(void)
 {
 #if CONF_WITH_COLDFIRE_RS232
     return coldfire_rs232_can_write() ? -1 : 0;
+#elif defined (MACHINE_A2560U)
+    return a2560u_bios_bcostat1();
 #elif CONF_WITH_MFP_RS232
 # if RS232_DEBUG_PRINT
     return (MFP_BASE->tsr & 0x80) ? -1 : 0;
@@ -300,6 +303,9 @@ LONG bconout1(WORD dev, WORD b)
 
 #if CONF_WITH_COLDFIRE_RS232
     coldfire_rs232_write_byte(b);
+    return 1;
+#elif defined(MACHINE_A2560U)
+    a2560u_bios_bconout1(b);
     return 1;
 #elif CONF_WITH_MFP_RS232
 # if RS232_DEBUG_PRINT
@@ -382,6 +388,8 @@ ULONG rsconf1(WORD baud, WORD ctrl, WORD ucr, WORD rsr, WORD tsr, WORD scr)
 {
 #if CONF_WITH_MFP_RS232
     return rsconf_mfp(MFP_BASE,&iorec1,baud,ctrl,ucr,rsr,tsr,scr);
+#elif defined(MACHINE_A2560U)
+    a2560u_bios_rsconf1(baud, &iorec1, ctrl, ucr, rsr, tsr, scr);
 #else
     return 0UL;
 #endif  /* CONF_WITH_MFP_RS232 */
@@ -1042,6 +1050,10 @@ void init_serport(void)
 # if !RS232_DEBUG_PRINT
     mfpint(MFP_TBE,(LONG)mfp_rs232_tx_interrupt);
 # endif
+#endif
+
+#ifdef MACHINE_A2560U
+    a2560u_bios_rs232_init();
 #endif
 
 #ifdef __mcoldfire__

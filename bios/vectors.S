@@ -11,6 +11,10 @@
 
 #include "asmdefs.h"
 
+#ifdef MACHINE_A2560U
+#include "../foenix/foenix.i"
+#endif
+
 // ==== Definitions ==========================================================
 
         .globl  _init_exc_vec
@@ -336,17 +340,60 @@ _int_vbl:
 #ifdef __mcoldfire__
         lea     -56(sp), sp
         movem.l d1-d7/a0-a6, (sp)       // save registers
+#elif defined(MACHINE_A2560U)
+        movem.l d1-d7/a1-a6, -(sp)      // save registers (d0/a0 already saved by VICKY interrupt handler)
 #else
         movem.l d0-d7/a0-a6, -(sp)      // save registers
 #endif
-        addq.l  #1, _vbclock.w          // count number of VBL interrupts
+        addq.l  #1, _vbclock.w          // count number of processed VBL interrupts
 
 #if CONF_WITH_ATARI_VIDEO
 // check for monitor switching and jump to _swv_vec if necessary...
         jsr     _detect_monitor_change
 #endif
 
+#if !defined(MACHINE_A2560U) || CONF_WITH_A2560U_SHADOW_FRAMEBUFFER /* If we have text mode only, VICKY takes care of the blinking */
         jsr     _blink                  // blink cursor
+#endif
+
+#if CONF_WITH_A2560U_SHADOW_FRAMEBUFFER
+        .GLOBAL a2560u_sfb_copy_fb_to_vram
+        .GLOBAL _a2560u_bios_sfb_is_active
+        .GLOBAL _a2560u_sfb_addr
+
+        tst.w   _a2560u_bios_sfb_is_active
+        beq.s   skip_sfb_copy
+        move.l  _v_bas_ad.w, _a2560u_sfb_addr
+        jbsr    a2560u_sfb_copy_fb_to_vram
+skip_sfb_copy:
+#endif
+
+#if defined(MACHINE_A2560U) && 0
+        // Support of Setpalette
+        .globl _convert_atari2vicky_color
+        .globl _vicky2_set_lut_color
+        move.l  _colorptr.w,d0
+        jeq     scrnpt
+        // Load new color palette
+        lea     _colorptr.w,a3
+        move.l  d0,VICKY_A_BG_COLOR     // Color 0 in LUT is "transparent" so has no effect
+        moveq   #0,d3
+palcpy: move.w  (a3)+,-(sp)             // First, convert Atari 4 bit to 8 bit Foenix color spec
+        jbsr    _convert_atari2vicky_color
+        move.l  d0,-(sp)                // VICKY color
+        move.w  d3,-(sp)                // Color number
+        move.w  #0,-(sp)                // LUT number, avoid RMW
+        jbsr    _vicky2_set_lut_color
+        addq.w  #8,sp
+        addq.w  #1,d3
+        cmpi.w  #16,d3                  // We only copy the first 16 color entries. TT/Falcon-specific progs are rare enough.
+        bne.s   palcpy;
+
+        // Support of set new video address at VBL (_screenpt variable)
+scrnpt: move.l  _screenpt.w,d0
+        jeq     vbl_no_screenpt
+        move.l  d0,_v_bas_ad.w        
+#endif
 
 #if CONF_WITH_ATARI_VIDEO
 // the contents of colorptr indicate the palette processing required; since
@@ -469,6 +516,8 @@ vbl_no_dump:
 #ifdef __mcoldfire__
         movem.l (sp), d1-d7/a0-a6       // restore registers
         lea     56(sp), sp
+#elif defined(MACHINE_A2560U)
+        movem.l (sp)+, d1-d7/a1-a6      // restore registers
 #else
         movem.l (sp)+, d0-d7/a0-a6      // restore registers
 #endif
@@ -495,11 +544,12 @@ vbl_end:
 
 _int_timerc:
         addq.l  #1, _hz_200.w           // increment 200 Hz counter
-
 #ifdef __mcoldfire__
         // Save early ColdFire registers
         move.l  d0,-(sp)
         move.l  a0,-(sp)
+#elif defined(MACHINE_A2560U)
+        move.w  #0x0400,0xb00102        // adjust this for HZ200_TIMER_NUMBER to acknowledge the correct GAVIN Timer interrupt
 #endif
 
 #ifdef __mcoldfire__

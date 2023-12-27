@@ -26,6 +26,11 @@ OUTPUT_FORMAT(binary)
 # define ROM_ORIGIN 0x00fa0000
 #elif defined(TARGET_192)
 # define ROM_ORIGIN 0x00fc0000
+#elif defined(MACHINE_A2560U)
+    // Use this for debug purposes (load OS to user ram)
+    # define ROM_ORIGIN 0x00100000
+    // Use the below instead, if building EmuTOS for going to the flash1 bank
+    //# define ROM_ORIGIN 0x00f00000
 #else
 # define ROM_ORIGIN 0x00e00000
 #endif
@@ -34,7 +39,11 @@ OUTPUT_FORMAT(binary)
  * Then our padding tool will eventually report an overflow, with a better
  * diagnostic message than the linker.
  */
-#define ROM_LENGTH 1M /* Maximum size before I/O area */
+#ifdef MACHINE_A2560U
+# define ROM_LENGTH 2M
+#else
+# define ROM_LENGTH 1M /* Maximum size before I/O area */
+#endif
 
 #endif /* !EMUTOS_LIVES_IN_RAM */
 
@@ -66,6 +75,7 @@ REGION_ALIAS("REGION_READ_ONLY", REGION_RAM)
 REGION_ALIAS("REGION_READ_ONLY", rom)
 #endif
 REGION_ALIAS("REGION_READ_WRITE", REGION_RAM)
+
 
 SECTIONS
 {

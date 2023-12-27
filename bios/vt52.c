@@ -12,6 +12,15 @@
  * option any later version.  See doc/license.txt for details.
  */
 
+/* The VT-52 module is responsible for console output. This includes:
+ * - Book keeping of text cursor location (automatic advance, wrap,
+ *   scroll, etc.).
+ * - Displaying of characters using the conout module.
+ * - Manage text cursor visibility / blinking.
+ */
+
+/* #define ENABLE_KDEBUG */
+
 #include "emutos.h"
 #include "lineavars.h"
 #include "font.h"
@@ -21,6 +30,7 @@
 #include "conout.h"
 #include "vt52.h"
 #include "bios.h"
+#include "a2560u_bios.h"
 
 #if CONF_SERIAL_CONSOLE_ANSI
 /* We disable cursor home commands because it is more convenient */
@@ -75,8 +85,6 @@ static void ascii_cr(void);
 static void esc_ch1(WORD);
 static void get_row(WORD);
 static void get_column(WORD);
-
-void blink(void);
 
 
 /* jumptable for ESC + uppercase character */
@@ -170,7 +178,7 @@ static void normal_ascii(WORD ch)
 #if CONF_SERIAL_CONSOLE_ANSI
         bconout(1, ch);
 #endif
-        ascii_out(ch);
+        conout_ascii_out(ch);
     }
 
     /* We handle the following control characters as special: */
@@ -232,7 +240,7 @@ static void do_backspace(void)
  */
 static void do_tab(void)
 {
-    move_cursor((v_cur_cx & 0xfff8) + 8, v_cur_cy);
+    conout_move_cursor((v_cur_cx & 0xfff8) + 8, v_cur_cy);
 }
 
 
@@ -281,7 +289,7 @@ static void get_column(WORD ch)
     sprintf(ansi, "\033[%d;%dH", row + 1, col + 1);
     bconout_str(1, ansi);
 #endif
-    move_cursor(col,row);
+    conout_move_cursor(col,row);
     con_state = normal_ascii;           /* Next char is not special */
 }
 
@@ -347,8 +355,8 @@ static void clear_and_home(void)
 #endif
 
     cursor_off();                               /* hide cursor */
-    move_cursor(0, 0);                          /* cursor home */
-    blank_out (0, 0, v_cel_mx, v_cel_my);       /* clear screen */
+    conout_move_cursor(0, 0);                   /* cursor home */
+    conout_blank_out (0, 0, v_cel_mx, v_cel_my);       /* clear screen */
     cursor_on_cnt();                            /* show cursor */
 }
 
@@ -363,7 +371,7 @@ static void cursor_up(void)
 #endif
 
     if ( v_cur_cy )
-        move_cursor(v_cur_cx, v_cur_cy - 1);
+        conout_move_cursor(v_cur_cx, v_cur_cy - 1);
 }
 
 
@@ -373,7 +381,7 @@ static void cursor_up(void)
 static void cursor_down_impl(void)
 {
     if (v_cur_cy != v_cel_my)
-        move_cursor(v_cur_cx, v_cur_cy + 1);
+        conout_move_cursor(v_cur_cx, v_cur_cy + 1);
 }
 
 
@@ -400,7 +408,7 @@ static void cursor_right(void)
 #endif
 
     if ( v_cur_cx != v_cel_mx)
-        move_cursor(v_cur_cx + 1, v_cur_cy);
+        conout_move_cursor(v_cur_cx + 1, v_cur_cy);
 }
 
 
@@ -410,7 +418,7 @@ static void cursor_right(void)
 static void cursor_left_impl(void)
 {
     if ( v_cur_cx )
-        move_cursor(v_cur_cx - 1, v_cur_cy);
+        conout_move_cursor(v_cur_cx - 1, v_cur_cy);
 }
 
 
@@ -441,7 +449,7 @@ static void cursor_home(void)
 # endif
 #endif
 
-    move_cursor(0, 0);
+    conout_move_cursor(0, 0);
 }
 
 
@@ -461,7 +469,7 @@ static void erase_to_eos(void)
         return;    /* yes, done */
 
     /* erase from upper left corner to lower right corner */
-    blank_out (0, v_cur_cy + 1, v_cel_mx, v_cel_my);
+    conout_blank_out (0, v_cur_cy + 1, v_cel_mx, v_cel_my);
 }
 
 
@@ -482,20 +490,20 @@ static void erase_to_eol_impl(void)
 
     /* is x = x maximum? */
     if ( v_cur_cx == v_cel_mx )
-        ascii_out(' ');         /* output a space, the cell is odd! */
+        conout_ascii_out(' ');         /* output a space, the cell is odd! */
     else {
         /* test, if x is even or odd */
         if ( IS_ODD(v_cur_cx) )
-            ascii_out(' ');     /* first output a space */
+            conout_ascii_out(' ');     /* first output a space */
 
-        blank_out (v_cur_cx, v_cur_cy, v_cel_mx, v_cur_cy);
+        conout_blank_out (v_cur_cx, v_cur_cy, v_cel_mx, v_cur_cy);
     }
 
     /* restore wrap flag, the result of EOL test */
     if ( wrap )
         v_stat_0 |= M_CEOL;
 
-    move_cursor(s_cur_x, s_cur_y); /* restore cursor position */
+    conout_move_cursor(s_cur_x, s_cur_y); /* restore cursor position */
     cursor_on_cnt();            /* show cursor */
 }
 
@@ -546,12 +554,12 @@ static void reverse_linefeed(void)
 {
     /* if not at top of screen */
     if ( v_cur_cy ) {
-        move_cursor(v_cur_cx, v_cur_cy - 1);
+        conout_move_cursor(v_cur_cx, v_cur_cy - 1);
     }
     else {
         int savex = v_cur_cx;           /* save current x position */
         insert_line();                  /* Insert a line */
-        move_cursor(savex, 0);
+        conout_move_cursor(savex, 0);
     }
 }
 
@@ -564,10 +572,10 @@ static void insert_line(void)
 #if CONF_SERIAL_CONSOLE_ANSI
     bconout_str(1, "\033[L");
 #endif
-    cursor_off();               /* hide cursor */
-    scroll_down(v_cur_cy);      /* scroll down 1 line & blank current line */
-    move_cursor(0, v_cur_cy);   /* move cursor to beginning of line */
-    cursor_on_cnt();            /* show cursor */
+    cursor_off();                      /* hide cursor */
+    conout_scroll_down(v_cur_cy);      /* scroll down 1 line & blank current line */
+    conout_move_cursor(0, v_cur_cy);   /* move cursor to beginning of line */
+    cursor_on_cnt();                   /* show cursor */
 }
 
 
@@ -580,8 +588,8 @@ static void delete_line(void)
     bconout_str(1, "\033[M");
 #endif
     cursor_off();               /* hide cursor */
-    scroll_up(v_cur_cy);        /* scroll up 1 line & blank bottom line */
-    move_cursor(0, v_cur_cy);   /* move cursor to beginning of line */
+    conout_scroll_up(v_cur_cy);        /* scroll up 1 line & blank bottom line */
+    conout_move_cursor(0, v_cur_cy);   /* move cursor to beginning of line */
     cursor_on_cnt();            /* show cursor */
 }
 
@@ -602,7 +610,7 @@ static void erase_from_home(void)
         return;    /* yes, done */
 
     /* erase rest of screen */
-    blank_out (0, 0, v_cel_mx, v_cur_cy - 1);        /* clear screen */
+    conout_blank_out (0, 0, v_cel_mx, v_cur_cy - 1);        /* clear screen */
 }
 
 
@@ -611,7 +619,10 @@ static void erase_from_home(void)
  */
 static void do_cnt_esce(void)
 {
-    invert_cell(v_cur_cx, v_cur_cy);        /* complement cursor */
+    #if 1
+        conout_paint_cursor();
+    #else // Previous EmuTOS code
+    conout_invert_cell(v_cur_cx, v_cur_cy);        /* complement cursor */
     v_stat_0 |= M_CVIS;                     /* set visibility bit */
 
     /* see if flashing is enabled */
@@ -621,6 +632,7 @@ static void do_cnt_esce(void)
         /* do not flash the cursor when it moves */
         v_cur_tim = v_period;                   /* reset the timer */
     }
+    #endif
 }
 
 
@@ -670,6 +682,16 @@ static void cursor_off(void)
 
     disab_cnt++;                        /* increment the disable counter */
 
+    #if 1
+    if (v_stat_0 & M_CVIS) {
+        v_stat_0 &= ~M_CVIS;                /* make invisible! */
+
+        if (!(v_stat_0 & M_CFLASH) || (v_stat_0 & M_CSTATE)) {
+            conout_unpaint_cursor();
+        }
+        v_stat_0 |= M_CVIS;
+    }
+    #else // Previous EmuTOS code
     /* test and clear the visible state bit */
     if (!(v_stat_0 & M_CVIS) )
         return;                         /* if already invisible, just return */
@@ -678,13 +700,14 @@ static void cursor_off(void)
 
     /* see, if flashing is disabled */
     if ( ! (v_stat_0 & M_CFLASH) ) {
-        invert_cell(v_cur_cx, v_cur_cy);
+        conout_invert_cell(v_cur_cx, v_cur_cy);
     }
     /* see, if cursor is on or off */
     else if ( v_stat_0 & M_CSTATE ) {
         v_stat_0 &= ~M_CSTATE;    /* cursor off? */
-        invert_cell(v_cur_cx, v_cur_cy);
+        conout_invert_cell(v_cur_cx, v_cur_cy);
     }
+    #endif
 }
 
 
@@ -717,9 +740,9 @@ static void restore_cursor_pos(void)
 #endif
 
     if ( v_stat_0 & M_SVPOS )
-        move_cursor(sav_cur_x, sav_cur_y);      /* move to saved position */
+        conout_move_cursor(sav_cur_x, sav_cur_y);      /* move to saved position */
     else
-        move_cursor(0, 0);      /* if position was not saved, home cursor */
+        conout_move_cursor(0, 0);      /* if position was not saved, home cursor */
 
     v_stat_0 &= ~M_SVPOS;    /* clear "position saved" status bit */
 }
@@ -737,8 +760,8 @@ static void erase_line(void)
 #endif
 
     cursor_off();               /* hide cursor */
-    blank_out (0, v_cur_cy, v_cel_mx, v_cur_cy);   /* blank whole line */
-    move_cursor(0, v_cur_cy);   /* move cursor to beginning of line */
+    conout_blank_out (0, v_cur_cy, v_cel_mx, v_cur_cy);   /* blank whole line */
+    conout_move_cursor(0, v_cur_cy);   /* move cursor to beginning of line */
     cursor_on_cnt();            /* show cursor */
 }
 
@@ -759,18 +782,18 @@ static void erase_from_bol_impl(void)
     s_cur_y = v_cur_cy;
 
     /*
-     * because blank_out() requires the ending x position to be
+     * because conout_blank_out() requires the ending x position to be
      * odd, we need to handle the two possibilities separately
      */
     if ( !IS_ODD(s_cur_x) ) {
-        ascii_out(' ');     /* first output a space */
+        conout_ascii_out(' ');     /* first output a space */
         if (s_cur_x)
-            blank_out(0, s_cur_y, s_cur_x-1, s_cur_y);
+            conout_blank_out(0, s_cur_y, s_cur_x-1, s_cur_y);
     }
     else
-        blank_out(0, s_cur_y, s_cur_x, s_cur_y);
+        conout_blank_out(0, s_cur_y, s_cur_x, s_cur_y);
 
-    move_cursor(s_cur_x, s_cur_y); /* restore cursor position */
+    conout_move_cursor(s_cur_x, s_cur_y); /* restore cursor position */
     cursor_on_cnt();            /* show cursor */
 }
 
@@ -821,7 +844,7 @@ static void line_wrap_off(void)
 static void ascii_cr(void)
 {
     /* beginning of current line */
-    move_cursor(0, v_cur_cy);
+    conout_move_cursor(0, v_cur_cy);
 }
 
 
@@ -835,7 +858,7 @@ static void ascii_lf(void)
         cursor_down_impl();
     else {
         cursor_off();                   /* yes, hide cursor */
-        scroll_up(0);                   /* scroll up 1 line */
+        conout_scroll_up(0);                   /* scroll up 1 line */
         cursor_on_cnt();                /* show cursor */
     }
 }
@@ -848,28 +871,7 @@ static void ascii_lf(void)
  */
 void blink(void)
 {
-    /* test visibility/semaphore bit */
-    if (!(v_stat_0 & M_CVIS) )
-        return;    /* if invisible or blocked, return */
-
-    /* test flash bit */
-    if (!(v_stat_0 & M_CFLASH) )
-        return;    /* if not flashing, return */
-
-    /* decrement cursor flash timer */
-    if ( --v_cur_tim )
-        return;    /* if <> 0, return */
-
-    v_cur_tim = v_period;       /* else reset timer */
-
-    /* toggle cursor state */
-    if ( v_stat_0 & M_CSTATE )
-        v_stat_0 &= ~M_CSTATE;    /* clear bit (overwrite) */
-    else
-        v_stat_0 |= M_CSTATE;    /* set bit (overwrite) */
-
-    /* fetch x and y coords and complement cursor */
-    invert_cell(v_cur_cx, v_cur_cy);
+    conout_blink_cursor();
 }
 
 
@@ -921,13 +923,12 @@ WORD cursconf(WORD function, WORD operand)
 void vt52_init(void)
 {
     /* set font-related lineA variables */
-    font_set_default();
+    conout_init(font_set_default());
 
     /* Initial cursor settings */
     v_cur_cx = 0;                       /* cursor to column 0, row 0 */
     v_cur_cy = 0;
     v_cur_of = 0;                       /* line offset is 0 */
-    v_cur_ad = v_bas_ad;                /* set cursor to start of screen */
 
     v_stat_0 = M_CFLASH;                /* cursor invisible, flash, nowrap, normal video */
     cursconf(4, 30);                    /* 0.5 second blink rate (@ 60Hz vblank) */

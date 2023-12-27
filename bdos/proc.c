@@ -184,16 +184,16 @@ long xexec(WORD flag, char *path, char *tail, char *env)
     LONG rc;
     FH fh;
 
-    KDEBUG(("BDOS xexec: flag or mode = %d\n",flag));
+    KDEBUG(("BDOS xexec: '%s' flag or mode = %d\n",path?path:"",flag));
 
     /* first branch - actions that do not require loading files */
     switch (flag) {
 #if DETECT_NATIVE_FEATURES
-    case PE_RELOCATE:   /* internal use only, see natfeat_bootstrap() in bdos/bootstrap.c */
+    case PE_RELOCATE:   /* internal use only, see bootstrap() in bios/bios.c */
         p = (PD *) tail;
         rc = kpgm_relocate(p, (long)path);
         if (rc) {
-            KDEBUG(("BDOS xexec: kpgm_reloc returned %ld (0x%lx)\n",rc,rc));
+            KDEBUG(("BDOS xexec(PE_RELOCATE): kpgm_reloc returned %ld (0x%lx)\n",rc,rc));
             return rc;
         }
 
@@ -206,40 +206,48 @@ long xexec(WORD flag, char *path, char *tail, char *env)
         return (long)p;
 #endif
     case PE_BASEPAGE:           /* just create a basepage */
+        KDEBUG(("BDOS xexec(PE_BASEPAGE)\n"));
         path = (char *) 0L;     /* (same as basepage+flags with flags set to zero) */
         FALLTHROUGH;
     
     case PE_BASEPAGEFLAGS:      /* create a basepage, respecting the flags */
+        KDEBUG(("BDOS xexec(PE_BASEPAGEFLAGS)\n"));
         lstate.flags = (ULONG)path;
         lstate.owner = run;
         lstate.relocatable_size = 0;
 
         p = alloc_pd_tpa_and_setup_env(&lstate, tail, env);
-        if (p == NULL)
+        if (p == NULL) {
+            KDEBUG(("BDOS xexec(PE_BASEPAGEFLAGS) returning ENSMEM")); 
             return ENSMEM;
+        }
 
         /* initialize the PD */
         p->p_flags = lstate.flags;   /* set the flags */
         init_pd_files(p);
-
+        KDEBUG(("BDOS xexec(PE_BASEPAGEFLAGS) returning %p TEXT:%p\n", p, p->p_tbase));
         return (long)p;
     
     case PE_GOTHENFREE:
+        KDEBUG(("BDOS xexec(PE_GOTHENFREE)\n"));
         /* set the owner of the memory to be this process */
         p = (PD *) tail;
         set_owner(p, p);
         FALLTHROUGH;
     
     case PE_GO:
+        KDEBUG(("BDOS xexec(PE_GO)\n"));
         p = (PD *) tail;
         proc_go(p);
         /* should not return ? */
         return (long)p;
     
     case PE_LOADGO:
+        KDEBUG(("BDOS xexec(PE_LOADGO)\n"));
         FALLTHROUGH;
     
     case PE_LOAD:
+        KDEBUG(("BDOS xexec(PE_LOAD)\n"));
         break;
     
     default:
@@ -403,6 +411,7 @@ static PD *alloc_pd_tpa_and_setup_env(LOAD_STATE *lstate, const char *tail, cons
         , 0L
 #endif
     );
+    KDEBUG(("alloc_pd_tpa_and_setup_env allocated mem at %p\n",pd));
     if (!pd)
     {
         KDEBUG(("BDOS xexec: not enough memory for basepage\n"));
@@ -566,19 +575,23 @@ static void proc_go(PD *p)
 {
     struct gouser_stack *sp;
 
-    KDEBUG(("BDOS xexec: trying to load (and execute) a process on %p ...\n",p->p_tbase));
+    KDEBUG(("BDOS proc_go: trying to load (and execute) a process PD=%p on %p ...\n",p, p->p_tbase));
     p->p_parent = run;
 
     /* create a stack at the end of the TPA */
     sp = (struct gouser_stack *) (p->p_hitpa - sizeof(struct gouser_stack));
+    KDEBUG(("sp: %p p->p_hitpa=%p\n", (void*)sp, (void*)p->p_hitpa));
 
     sp->basepage = p;      /* the stack contains the basepage */
+    KDEBUG(("basepage: %p\n", (void*)sp->basepage));
 
     sp->retaddr = (long)p->p_tbase; /* return address a3 is text start */
-    sp->sr = get_sr() & 0x0700;  /* the process will start in user mode, same IPL */
+    sp->sr = get_sr() & 0x0700;  /* the process will start in user mode, same IPL */    
+    KDEBUG(("retaddr: %p, sr=%04x\n", (void*)sp->retaddr, sp->sr));
 
     /* the other stack is the supervisor stack */
     sp->other_sp = (long) &supstk[SUPSIZ];
+    KDEBUG(("other_sp: %p\n", (void*)sp->other_sp));
 
     /* store this new stack in the saved a7 field of the PD */
     p->p_areg[7-3] = (long) sp;
@@ -629,6 +642,7 @@ void x0term(void)
  */
 void xterm(UWORD rc)
 {
+    KDEBUG(("xterm PD:%p code:%d\n",run, rc));
     PFVOID userterm;
     PD *p = run;
 

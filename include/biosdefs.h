@@ -84,6 +84,15 @@ typedef struct _bpb BPB;
 #define B_16    1       /* device has 16-bit FATs */
 #define B_1FAT  2       /* device has only a single FAT */
 
+
+/*  low/high addresses were programs will be loaded.
+ *  This matches the TOS's system variables. */
+typedef struct  
+{
+    void *membot;       /* start of TPA (user memory) */
+    void *memtop;       /* end of TPA (user memory) */
+} TPA_AREA;
+
 /*
  * Flags for Kbshift()
  */
@@ -96,9 +105,9 @@ typedef struct _bpb BPB;
                         /* the following bits are ONLY set if the Alt key is already */
                         /* down.  however, they remain set until the corresponding   */
                         /* key is released, even if the Alt key is released first.   */
-#define MODE_HOME   0x20        /* Clr/Home is down        */
-#define MODE_INSERT 0x40        /* Insert is down          */
-#define MODE_SHIFT  (MODE_RSHIFT|MODE_LSHIFT)   /* shifted (convenience */
+#define MODE_MOUSEL 0x20        /* Left mouse button       */
+#define MODE_MOUSER 0x40        /* Right mouse button      */
+#define MODE_ALTGR  0x80        /* AltGr (since TOS 4.06/Milan according to tos.hyp) */
 
 /*
  * Struct returned by Kbdvbase()

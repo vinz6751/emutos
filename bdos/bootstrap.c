@@ -28,16 +28,15 @@
 #include "biosbind.h"   /* for Kbshift() */
 #include "biosext.h"
 #include "bdosbind.h"   /* it's ok to use the BDOS from the bootstraper */
-#include "initinfo.h"
+#include "../bios/blkdev.h"
+#include "../bios/initinfo.h"
 #if WITH_CLI
 #include "../cli/clistub.h"
 #endif
 
+#define ENABLE_KDEBUG
 
 #define ENABLE_RESET_RESIDENT 0 /* enable to run "reset-resident" code (see below) */
-
-/* Gloval variable */
-UBYTE bootflags;
 
 /* Environment stuff */
 #define ENV_SIZE    12              /* sufficient for standard PATH=^X:\^^ (^=nul byte) */
@@ -124,10 +123,12 @@ static void startup(void)
 
     KDEBUG(("drvbits = %08lx\n",drvbits));
 
+#if CONF_ATARI_HARDWARE
     /* Steem needs this to initialize its GEMDOS hard disk emulation.
      * This may change drvbits. See Steem sources:
      * File steem/code/emulator.cpp, function intercept_bios(). */
     Drvmap();
+#endif
 
     /* If it's not the first boot, we use the existing bootdev.
      * this allows a boot device that was selected via the welcome
@@ -169,13 +170,13 @@ static void startup(void)
 
     init_default_environment(); /* Build default environment string */
 
-#if ENABLE_RESET_RESIDENT
-    run_reset_resident();
-#endif
+    /* Normal EmuTOS would run run_reset_resident() here, but I think that's a BIOS feature
+     * so in better to have that done in the BIOS startup so it's moved there. */
 
 #if WITH_CLI
     if (bootflags & BOOTFLAG_EARLY_CLI)
     {
+        KDEBUG(("Launching CLI"));
         /* Run an early console, passing the default environment */
         PD *pd = (PD *) Pexec(PE_BASEPAGEFLAGS, (char *)PF_STANDARD, "", default_env);
         pd->p_tbase = (UBYTE *) coma_start;
@@ -194,6 +195,7 @@ static void startup(void)
         Pexec(PE_LOADGO, "COMMAND.PRG", "", NULL);
     } 
     else if (exec_os) {
+        KDEBUG(("Launching OS from %p", exec_os));
         /* Start the default (ROM) shell with the default environment (like Atari TOS) */
         PD *pd;
         pd = (PD *) Pexec(PE_BASEPAGEFLAGS, (char *)PF_STANDARD, "", default_env);
@@ -293,41 +295,44 @@ static void autoexec(void)
     }
 }
 
-#if ENABLE_RESET_RESIDENT
-/*
- * run_reset_resident - run "reset-resident" code
- *
- * "Reset-resident" code is code that has been loaded into RAM prior
- * to a warm boot.  It has a special header with a magic number, it
- * is 512 bytes long (aligned on a 512-byte boundary), and it has a
- * specific checksum (calculated on a word basis).
- *
- * Note: this is an undocumented feature of TOS that exists in all
- * versions of Atari TOS.
- */
-struct rrcode
-{
-    long magic;
-    struct rrcode *pointer;
-    char program[502];
-    short chksumfix;
-};
-#define RR_MAGIC    0x12123456L
-#define RR_CHKSUM   0x5678
 
-static void run_reset_resident(void)
-{
-    const struct rrcode *p = (const struct rrcode *)phystop;
+#if DETECT_NATIVE_FEATURES
 
-    for (--p; p > (struct rrcode *)&etv_timer; p--)
-    {
-        if (p->magic != RR_MAGIC)
-            continue;
-        if (p->pointer != p)
-            continue;
-        if (compute_cksum((const UWORD *)p) != RR_CHKSUM)
-            continue;
-        regsafe_call(p->program);
-    }
+static void bootstrap(void)
+{
+    /* start the kernel provided by the emulator */
+    PD *pd;
+    LONG length;
+    LONG r;
+    char args[128];
+
+    args[0] = '\0';
+    nf_getbootstrap_args(args, sizeof(args));
+
+    /* allocate space */
+    pd = (PD *) Pexec(PE_BASEPAGEFLAGS, (char*)PF_STANDARD, args, default_env);
+
+    /* get the TOS executable from the emulator */
+    length = nf_bootstrap(pd->p_lowtpa + sizeof(PD), pd->p_hitpa - pd->p_lowtpa);
+
+    /* free the allocated space if something is wrong */
+    if (length <= 0)
+        goto err;
+
+    /* relocate the loaded executable */
+    r = Pexec(PE_RELOCATE, (char *)length, (char *)pd, default_env);
+    if (r != (LONG)pd)
+        goto err;
+
+    /* set the boot drive for the new OS to use */
+    bootdev = nf_getbootdrive();
+
+    /* execute the relocated process */
+    Pexec(PE_GO, "", (char *)pd, default_env);
+
+err:
+    Mfree(pd->p_env); /* Mfree() the environment */
+    Mfree(pd); /* Mfree() the process area */
 }
-#endif
+
+#endif /* DETECT_NATIVE_FEATURES */

@@ -37,6 +37,9 @@
 #define DISPLAY_INSTRUCTION_AT_PC   0   /* set to 1 for extra info from dopanic() */
 #define DISPLAY_STACK               0   /* set to 1 for extra info from dopanic() */
 
+/* Tracks the availability of debug output devices */
+WORD boot_status;
+
 #if STONX_NATIVE_PRINT
 
 /* external declarations from kprintasm.S */

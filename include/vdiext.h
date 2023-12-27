@@ -57,11 +57,12 @@ typedef union {
 /* External definitions for internal use */
 extern VDISHARE vdishare;
 
-/* Line A extensions */
-extern struct _mcs *mcs_ptr;    /* ptr to mouse cursor save area in use */
+#if CONF_WITH_EXTENDED_MOUSE
+extern PFVOID user_wheel;  /* user mouse wheel vector provided by vdi_vex_wheelv() */
+#endif
 
 /* functions used by VDI & lineA */
-void update_rez_dependent(void);
+void vdi_resolution_changed(void);
 
 #endif /* ASM_SOURCE */
 

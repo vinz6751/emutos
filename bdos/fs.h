@@ -378,6 +378,7 @@ WORD ckdrv(int d, BOOL checkrem);
 /* log in media 'b' on drive 'drv'. */
 WORD log_media(BPB *b, int drv);
 
+
 LONG is_drive_available(WORD dev);
 
 /*
