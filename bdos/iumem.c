@@ -134,11 +134,9 @@ MD *find_first_large_enough_free_block(ULONG amount, MPB *mp, UBYTE *start_addre
     if (q->m_length == amount)
     {
         p->m_link = q->m_link;  /* take the whole thing */
-#if CONF_WITH_NON_RELOCATABLE_SUPPORT
         /* link allocated block into allocated list & mark owner of block */
         q->m_link = mp->mp_mal;
         mp->mp_mal = q;
-#endif
     }
     else
     {
