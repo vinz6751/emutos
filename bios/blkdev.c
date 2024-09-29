@@ -1,7 +1,7 @@
 /*
  * blkdev.c - BIOS block device functions
  *
- * Copyright (C) 2002-2022 The EmuTOS development team
+ * Copyright (C) 2002-2024 The EmuTOS development team
  *
  * Authors:
  *  MAD     Martin Doering
@@ -353,7 +353,7 @@ int add_partition(UWORD unit, LONG *devices_available, char id[], ULONG start, U
     b->unit  = unit;
 
     /* flag partitions that support GetBPB() */
-    if (getbpb_allowed(id))
+    if (getbpb_allowed(b->id))
         b->flags |= GETBPB_ALLOWED;
 
     /* make just GEM/BGM partitions visible to applications */
@@ -705,8 +705,9 @@ LONG blkdev_getbpb(WORD dev)
         tmp = 0UL;
     else
         tmp = (tmp - bdev->bpb.datrec) / b->spc;
-    if (tmp > MAX_FAT16_CLUSTERS)           /* FAT32 - unsupported */
+    if ((tmp > MAX_FAT16_CLUSTERS) || (bdev->bpb.fsiz == 0))
     {
+        /* FAT32 - unsupported */
         KINFO(("Disk %c: is inaccessible (FAT32)\n",dev+'A'));
         bdev->bpb.recsiz = 0;               /* mark it for XHDI */
         return 0L;

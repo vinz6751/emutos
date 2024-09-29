@@ -1,7 +1,7 @@
 /*
  * dmasound.c - STe/TT/Falcon DMA sound routines
  *
- * Copyright (C) 2011-2022 The EmuTOS development team
+ * Copyright (C) 2011-2024 The EmuTOS development team
  *
  * Authors:
  *  VRI   Vincent Rivière
@@ -580,6 +580,9 @@ LONG gpio(UWORD mode, UWORD data)
 #if MPS_STE_SOUND_ONLY
     return EBADRQ;
 #else
+    if (!has_falcon_dmasound)
+        return EBADRQ;
+
     switch (mode)
     {
      case 0:             /* Set direction */
