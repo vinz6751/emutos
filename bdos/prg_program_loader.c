@@ -325,7 +325,7 @@ LONG kpgm_relocate(PD *p, long length)
 #endif
 
 
-PROGRAM_LOADER prg_program_loader = {
+const PROGRAM_LOADER prg_program_loader = {
     can_load,
     get_program_info,
     prg_load_program_into_memory

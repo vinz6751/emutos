@@ -110,7 +110,7 @@ static LONG pgz_load_program_into_memory(FH fh, PD *pd, LOAD_STATE *lstate)
     return ENSMEM;
 }
 
-PROGRAM_LOADER pgz_program_loader = {
+const PROGRAM_LOADER pgz_program_loader = {
     can_load,
     get_program_info,
     pgz_load_program_into_memory
